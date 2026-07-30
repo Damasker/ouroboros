@@ -21,6 +21,8 @@ The `EnergyLedger` is the primary scientific integrity mechanism. It must make c
 | `E_exhaust` | loss/output | Leaving system before recovery |
 | `E_magnetic_loss` | loss | Ohmic / quench dump |
 | `E_transport` | loss | Cross-field / phenomenological transport |
+| `E_friction` | loss | Mechanical friction work \(\int b v^2\,dt\) |
+| `E_drive_work` | input | Mechanical work of external drive forces \(\int F_{\mathrm{drive}} v\,dt\) |
 | `E_error` | residual | Closure defect |
 
 ## Closure identity (per accepted step / interval)
