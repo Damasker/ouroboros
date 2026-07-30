@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0.0",
+  "nodes": [
+    {
+      "id": "a_in",
+      "x": -2.0,
+      "y": 1.0,
+      "z": 0.0
+    },
+    {
+      "id": "a_throttle",
+      "x": -0.5,
+      "y": 1.0,
+      "z": 0.0
+    },
+    {
+      "id": "chamber_in",
+      "x": 0.0,
+      "y": 0.5,
+      "z": 0.0
+    },
+    {
+      "id": "b_in",
+      "x": -2.0,
+      "y": -1.0,
+      "z": 0.0
+    },
+    {
+      "id": "b_throttle",
+      "x": -0.5,
+      "y": -1.0,
+      "z": 0.0
+    },
+    {
+      "id": "chamber_out",
+      "x": 1.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "id": "expand",
+      "x": 2.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "id": "separator",
+      "x": 3.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "id": "return_mid",
+      "x": 2.0,
+      "y": -2.0,
+      "z": 0.0
+    },
+    {
+      "id": "split",
+      "x": -2.0,
+      "y": -2.0,
+      "z": 0.0
+    }
+  ],
+  "segments": [
+    {
+      "id": "branch_a",
+      "start_node": "a_in",
+      "end_node": "a_throttle",
+      "radius_m": 0.15,
+      "length_m": 1.5,
+      "element_type": "branch",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "throttle_a",
+      "start_node": "a_throttle",
+      "end_node": "chamber_in",
+      "radius_m": 0.12,
+      "length_m": 1.2,
+      "element_type": "throttle",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "branch_b",
+      "start_node": "b_in",
+      "end_node": "b_throttle",
+      "radius_m": 0.15,
+      "length_m": 1.5,
+      "element_type": "branch",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "throttle_b",
+      "start_node": "b_throttle",
+      "end_node": "chamber_in",
+      "radius_m": 0.12,
+      "length_m": 1.2,
+      "element_type": "throttle",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "reaction_chamber",
+      "start_node": "chamber_in",
+      "end_node": "chamber_out",
+      "radius_m": 0.4,
+      "length_m": 1.0,
+      "element_type": "chamber",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "expansion",
+      "start_node": "chamber_out",
+      "end_node": "expand",
+      "radius_m": 0.25,
+      "length_m": 1.0,
+      "element_type": "expansion",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "separator",
+      "start_node": "expand",
+      "end_node": "separator",
+      "radius_m": 0.2,
+      "length_m": 1.0,
+      "element_type": "separator",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "return_channel",
+      "start_node": "separator",
+      "end_node": "return_mid",
+      "radius_m": 0.18,
+      "length_m": 2.2,
+      "element_type": "return",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "return_to_split",
+      "start_node": "return_mid",
+      "end_node": "split",
+      "radius_m": 0.18,
+      "length_m": 4.0,
+      "element_type": "return",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "feed_a",
+      "start_node": "split",
+      "end_node": "a_in",
+      "radius_m": 0.15,
+      "length_m": 3.0,
+      "element_type": "branch",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "feed_b",
+      "start_node": "split",
+      "end_node": "b_in",
+      "radius_m": 0.15,
+      "length_m": 1.0,
+      "element_type": "branch",
+      "orientation": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

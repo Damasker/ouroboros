@@ -1,0 +1,38 @@
+simulation:
+  duration_s: 0.15
+  output_interval_s: 0.005
+  scenario: fault-quench
+  integrator:
+    method: BDF
+    rtol: 1.0e-5
+    atol: 1.0e-8
+    max_step_s: 1.0e-3
+throttle_a:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-4
+  mutual_inductance_h: 0.0
+  current_limit_a: 50.0
+  field_limit_t: 1.0
+  initial_current_a: 40.0
+  quench_resistance_ohm: 0.5
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-4
+  mutual_inductance_h: 0.0
+  initial_current_a: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: true
+faults:
+  force_quench_a: true
+energy:
+  relative_tolerance: 5.0e-2
+numerics:
+  max_nfev: 50000

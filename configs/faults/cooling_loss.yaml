@@ -1,0 +1,32 @@
+simulation:
+  duration_s: 0.2
+  output_interval_s: 0.01
+  scenario: fault-cooling-loss
+  integrator:
+    max_step_s: 2.0e-3
+plasma:
+  initial_ion_temperature_ev: 500.0
+  initial_electron_temperature_ev: 500.0
+throttle_a:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: true
+  exhaust: false
+  magnetic: false
+  wall_loss_coeff_s: 2.0
+drive:
+  external_heater_w: 2.0e4
+faults:
+  cooling_loss: true
+energy:
+  relative_tolerance: 1.0e-2
+numerics:
+  max_nfev: 50000

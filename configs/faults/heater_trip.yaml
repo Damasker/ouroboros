@@ -1,0 +1,28 @@
+simulation:
+  duration_s: 0.2
+  output_interval_s: 0.005
+  scenario: fault-heater-trip
+  integrator:
+    max_step_s: 2.0e-3
+throttle_a:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: true
+  wall: false
+  exhaust: false
+  magnetic: false
+drive:
+  external_heater_w: 1.0e5
+faults:
+  heater_trip: true
+energy:
+  relative_tolerance: 1.0e-2
+numerics:
+  max_nfev: 50000

@@ -1,0 +1,26 @@
+simulation:
+  duration_s: 0.15
+  output_interval_s: 0.01
+  scenario: fault-density-spike
+  integrator:
+    max_step_s: 2.0e-3
+throttle_a:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  mutual_inductance_h: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: true
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: false
+faults:
+  density_spike_factor: 5.0
+energy:
+  relative_tolerance: 5.0e-2
+numerics:
+  max_nfev: 50000

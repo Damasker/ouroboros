@@ -1,0 +1,66 @@
+simulation:
+  duration_s: 0.5
+  output_interval_s: 0.01
+  scenario: synthetic-oscillation
+  integrator:
+    method: LSODA
+    rtol: 1.0e-6
+    atol: 1.0e-9
+    max_step_s: 5.0e-3
+geometry:
+  chamber_volume_m3: 1.0
+  branch_a_volume_m3: 0.45
+  branch_b_volume_m3: 0.35
+  return_channel_volume_m3: 0.3
+  branch_cross_section_m2: 0.05
+plasma:
+  initial_density_m3: 8.0e18
+  initial_ion_temperature_ev: 150.0
+  initial_electron_temperature_ev: 150.0
+  initial_flow_a_m_s: 60.0
+  initial_flow_b_m_s: 20.0
+  effective_inertia_kg: 5.0e-5
+  friction_coeff_kg_s: 5.0e-5
+  confinement_time_s: 0.1
+throttle_a:
+  inductance_h: 5.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0
+  initial_current_a: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  inductance_h: 5.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0
+  initial_current_a: 0.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: true
+  wall: false
+  exhaust: false
+  magnetic: true
+  wall_loss_coeff_s: 0.0
+  exhaust_loss_coeff_s: 0.0
+drive:
+  external_heater_w: 0.0
+  # Placeholder synthetic heat — NOT fusion.
+  synthetic_heat_w: 2.0e4
+  synthetic_heat_modulation_hz: 2.0
+  synthetic_heat_modulation_amp: 1.5e4
+  drive_force_a_n: 1.0e-2
+  drive_force_b_n: -5.0e-3
+controller:
+  type: slow_supervisor
+  parameters:
+    update_period_s: 0.05
+    heater_w: 0.0
+    density_target_m3: 8.0e18
+    valve_gain: 0.05
+energy:
+  relative_tolerance: 1.0e-2
+numerics:
+  max_nfev: 100000
+faults: {}

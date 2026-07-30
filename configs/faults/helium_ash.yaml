@@ -1,0 +1,26 @@
+simulation:
+  duration_s: 0.15
+  output_interval_s: 0.01
+  scenario: fault-helium
+plasma:
+  initial_ion_temperature_ev: 5000.0
+  initial_electron_temperature_ev: 5000.0
+  initial_density_m3: 1.0e19
+fusion:
+  enabled: true
+  reactivity_model: bosch_hale
+losses:
+  bremsstrahlung: true
+  transport: true
+  wall: true
+  exhaust: false
+  magnetic: false
+  wall_loss_coeff_s: 1.0
+drive:
+  external_heater_w: 1.0e5
+faults:
+  helium_source_rate_s: 1.0e18
+energy:
+  relative_tolerance: 5.0e-2
+numerics:
+  max_nfev: 50000

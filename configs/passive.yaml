@@ -1,0 +1,64 @@
+simulation:
+  duration_s: 0.5
+  output_interval_s: 0.005
+  scenario: passive
+  strict_energy: false
+  integrator:
+    method: LSODA
+    rtol: 1.0e-7
+    atol: 1.0e-10
+    max_step_s: 1.0e-3
+geometry:
+  chamber_volume_m3: 1.0
+  branch_a_volume_m3: 0.4
+  branch_b_volume_m3: 0.4
+  return_channel_volume_m3: 0.3
+  expansion_volume_m3: 0.2
+  branch_cross_section_m2: 0.05
+plasma:
+  initial_density_m3: 1.0e19
+  initial_ion_temperature_ev: 100.0
+  initial_electron_temperature_ev: 100.0
+  initial_flow_a_m_s: 80.0
+  initial_flow_b_m_s: 72.0
+  deuterium_fraction: 0.5
+  tritium_fraction: 0.5
+  effective_inertia_kg: 1.0e-4
+  friction_coeff_kg_s: 5.0e-4
+  confinement_time_s: 0.2
+throttle_a:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0   # zero for cleaner passive energy tests
+  current_limit_a: 1.0e5
+  field_limit_t: 12.0
+  initial_current_a: 10.0
+  coupling_force_coeff_n_per_a: 0.0
+throttle_b:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0
+  current_limit_a: 1.0e5
+  field_limit_t: 12.0
+  initial_current_a: 8.0
+  coupling_force_coeff_n_per_a: 0.0
+fusion:
+  enabled: false
+  reaction: DT
+  reactivity_model: bosch_hale
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: true
+  recovery_fraction: 0.0
+drive:
+  external_heater_w: 0.0
+  synthetic_heat_w: 0.0
+controller:
+  type: none
+energy:
+  relative_tolerance: 1.0e-4
+  absolute_floor_j: 1.0e-6
+faults: {}

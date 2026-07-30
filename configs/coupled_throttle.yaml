@@ -1,0 +1,41 @@
+# Optional demo: weak phenomenological throttle–flow coupling (Milestone 2).
+# Residual tolerance relaxed because F_mag and mutual EMF are not variationally consistent.
+simulation:
+  duration_s: 0.4
+  output_interval_s: 0.01
+  scenario: coupled-throttle
+  integrator:
+    method: BDF
+    rtol: 1.0e-5
+    atol: 1.0e-8
+    max_step_s: 2.0e-3
+plasma:
+  initial_flow_a_m_s: 50.0
+  initial_flow_b_m_s: 10.0
+  effective_inertia_kg: 1.0e-4
+  friction_coeff_kg_s: 1.0e-4
+throttle_a:
+  inductance_h: 2.0e-3
+  resistance_ohm: 2.0e-3
+  mutual_inductance_h: 1.0e-4
+  coupling_force_coeff_n_per_a: 2.0e-4
+throttle_b:
+  inductance_h: 2.0e-3
+  resistance_ohm: 2.0e-3
+  mutual_inductance_h: 1.0e-4
+  coupling_force_coeff_n_per_a: 2.0e-4
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: true
+drive:
+  drive_force_a_n: 5.0e-3
+  drive_force_b_n: 1.0e-3
+energy:
+  relative_tolerance: 5.0e-2
+numerics:
+  max_nfev: 80000
