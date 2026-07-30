@@ -5,8 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ouroboros.core import run_simulation
-from ouroboros.core.system import LoopSystem
+from ouroboros.core import build_system, run_simulation
 from ouroboros.domain import SimulationResult
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.io import load_config, write_run_directory
@@ -24,7 +23,7 @@ class SimulationSession:
 
     def __init__(self, config: SimulationConfig, run_id: str | None = None) -> None:
         self.config = config
-        self.system = LoopSystem(config)
+        self.system = build_system(config)
         self.y = self.system.initial_state()
         self.t = 0.0
         self.run_id = run_id
@@ -70,7 +69,7 @@ class SimulationSession:
     def run_interval(self, duration_s: float | None = None) -> SimulationResult:
         if duration_s is not None:
             self.config.simulation.duration_s = duration_s
-        result = run_simulation(self.config, run_id=self.run_id, system=LoopSystem(self.config))
+        result = run_simulation(self.config, run_id=self.run_id, system=build_system(self.config))
         self._result = result
         self._stopped = True
         return result

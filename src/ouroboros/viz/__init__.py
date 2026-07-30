@@ -147,6 +147,27 @@ def plot_all(run_dir: str | Path) -> list[Path]:
     _save(fig, p)
     written.append(p)
 
+    # Multi-zone spatial profile (final frame), if present
+    zone_keys = sorted(k for k in data if k.startswith("zone_density:"))
+    if zone_keys:
+        ids = [k.split(":", 1)[1] for k in zone_keys]
+        dens = [data[k][-1] for k in zone_keys]
+        temps = [data.get(f"zone_temp_ev:{zid}", [float("nan")])[-1] for zid in ids]
+        fig, ax = plt.subplots(figsize=(10, 4))
+        x = np.arange(len(ids))
+        ax.bar(x - 0.15, dens, width=0.3, label="density")
+        ax2 = ax.twinx()
+        ax2.plot(x, temps, color="C1", marker="o", label="T [eV]")
+        ax.set_xticks(x)
+        ax.set_xticklabels(ids, rotation=45, ha="right", fontsize=7)
+        ax.set_ylabel("n [m^-3]")
+        ax2.set_ylabel("T [eV]")
+        ax.set_title("Multi-zone profile (final)")
+        ax.grid(True, alpha=0.3)
+        p = out_dir / "zone_profile.png"
+        _save(fig, p)
+        written.append(p)
+
     manifest = {"plots": [str(x.name) for x in written]}
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return written

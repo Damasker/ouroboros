@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Any, Protocol
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -13,23 +14,40 @@ from ouroboros.core.exceptions import (
     NonPhysicalStateError,
     SimulationAbortError,
 )
+from ouroboros.core.multizone import MultiZoneSystem
 from ouroboros.core.system import SERIES_KEYS, LoopSystem
-from ouroboros.domain import EventSeverity, SimulationEvent, SimulationResult
+from ouroboros.domain import EnergyLedger, EventSeverity, SimulationEvent, SimulationResult
 from ouroboros.domain.config import SimulationConfig
 
 logger = logging.getLogger(__name__)
 
 
+class SupportsSimulation(Protocol):
+    events: list[SimulationEvent]
+    _energy_trusted: bool
+
+    def initial_state(self) -> np.ndarray: ...
+    def rhs(self, t: float, y: np.ndarray) -> np.ndarray: ...
+    def sample_series(self, t: float, y: np.ndarray) -> dict[str, float]: ...
+    def ledger_from_state(self, y: np.ndarray) -> EnergyLedger: ...
+    def check_energy_or_raise(self, y: np.ndarray, t: float) -> EnergyLedger: ...
+
+
+def build_system(config: SimulationConfig) -> SupportsSimulation:
+    if config.simulation.model == "multizone":
+        return MultiZoneSystem(config)
+    return LoopSystem(config)
+
+
 def run_simulation(
     config: SimulationConfig,
     run_id: str | None = None,
-    system: LoopSystem | None = None,
+    system: SupportsSimulation | None = None,
 ) -> SimulationResult:
     """Integrate the loop system and return time series + ledger."""
     run_id = run_id or str(uuid.uuid4())
-    system = system or LoopSystem(config)
+    system = system or build_system(config)
     y0 = system.initial_state()
-    # Refresh diagnostics at t=0
     system.rhs(0.0, y0)
     t_end = config.simulation.duration_s
     out_dt = max(config.simulation.output_interval_s, 1e-6)
@@ -71,14 +89,19 @@ def run_simulation(
         )
         ledger = system.ledger_from_state(y0)
         sample0 = system.sample_series(0.0, y0)
+        keys = list(dict.fromkeys([*SERIES_KEYS, *sample0.keys()]))
         return SimulationResult(
             run_id=run_id,
             times_s=[0.0],
-            series={k: [float(sample0[k])] for k in SERIES_KEYS},
+            series={k: [float(sample0.get(k, float("nan")))] for k in keys},
             events=system.events,
             ledger_final=ledger,
             config_dict=config.model_dump(),
-            metadata={"aborted": True, "reason": str(exc)},
+            metadata={
+                "aborted": True,
+                "reason": str(exc),
+                "model": config.simulation.model,
+            },
             energy_trusted=False,
         )
 
@@ -93,8 +116,9 @@ def run_simulation(
         )
 
     times: list[float] = []
-    series: dict[str, list[float]] = {k: [] for k in SERIES_KEYS}
+    series: dict[str, list[float]] = {}
     energy_trusted = True
+    zone_snapshots: list[list[dict[str, Any]]] = []
 
     for i, t in enumerate(sol.t):
         y = sol.y[:, i]
@@ -109,15 +133,33 @@ def run_simulation(
             break
         sample = system.sample_series(float(t), y)
         times.append(float(t))
-        for k in SERIES_KEYS:
-            series[k].append(float(sample[k]))
+        for k, v in sample.items():
+            series.setdefault(k, []).append(float(v))
+        if hasattr(system, "zone_snapshot_segments"):
+            zone_snapshots.append(system.zone_snapshot_segments(y))  # type: ignore[attr-defined]
         if not ledger.trusted:
             energy_trusted = False
+
+    # Ensure core SERIES_KEYS exist even if missing
+    for k in SERIES_KEYS:
+        series.setdefault(k, [float("nan")] * len(times))
 
     y_final = sol.y[:, len(times) - 1] if times else y0
     ledger_final = system.ledger_from_state(y_final)
     if not ledger_final.trusted:
         energy_trusted = False
+
+    meta: dict[str, Any] = {
+        "integrator_message": sol.message,
+        "integrator_success": bool(sol.success),
+        "n_steps": int(getattr(sol, "nfev", nfev_box["n"])),
+        "scenario": config.simulation.scenario,
+        "model": config.simulation.model,
+    }
+    if zone_snapshots:
+        meta["zone_snapshot_count"] = len(zone_snapshots)
+        # Store compact final-frame zone snapshot in metadata for exporters
+        meta["final_zone_segments"] = zone_snapshots[-1]
 
     return SimulationResult(
         run_id=run_id,
@@ -126,11 +168,6 @@ def run_simulation(
         events=system.events,
         ledger_final=ledger_final,
         config_dict=config.model_dump(),
-        metadata={
-            "integrator_message": sol.message,
-            "integrator_success": bool(sol.success),
-            "n_steps": int(getattr(sol, "nfev", nfev_box["n"])),
-            "scenario": config.simulation.scenario,
-        },
+        metadata=meta,
         energy_trusted=energy_trusted and system._energy_trusted,
     )

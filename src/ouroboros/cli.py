@@ -19,6 +19,8 @@ SCENARIO_CONFIGS = {
     "synthetic-oscillation": "configs/synthetic_oscillation.yaml",
     "dt-fusion": "configs/dt_fusion.yaml",
     "coupled-throttle": "configs/coupled_throttle.yaml",
+    "multizone-passive": "configs/multizone_passive.yaml",
+    "multizone-driven": "configs/multizone_driven.yaml",
     "fault-block-a": "configs/faults/block_branch_a.yaml",
     "fault-quench": "configs/faults/quench.yaml",
     "fault-heater-trip": "configs/faults/heater_trip.yaml",

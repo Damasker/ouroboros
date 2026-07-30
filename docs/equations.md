@@ -2,6 +2,12 @@
 
 All symbols use SI unless an explicit conversion is stated. Coefficients marked **phenomenological** or **placeholder** are not validated reactor parameters.
 
+## 0. Multi-zone network (Milestone 6)
+
+When `simulation.model: multizone`, each geometry segment is a zone. Directed edges define exchange. Classification: simplified / phenomenological connectivity.
+
+Volumes are role-scaled from geometric \(\pi r^2 L\) to match `geometry.*_volume_m3` totals.
+
 ## 1. Particle balance (per zone)
 
 \[

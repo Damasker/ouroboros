@@ -52,4 +52,13 @@ Fault scenarios: branch blockage, cooling loss, throttle quench, density spike, 
 
 ## Geometry vs. physics
 
-A spatial loop description (nodes, segments, radii, orientations) is maintained for visualization and future 1D mapping. The v1 ODE system is 0D (lumped zones) and does **not** use coordinates in the RHS.
+A spatial loop description (nodes, segments, radii, orientations) is maintained for visualization and for the multi-zone model.
+
+### Models
+
+| `simulation.model` | Description |
+|--------------------|-------------|
+| `lumped` (default) | Fixed A/B/chamber/return bookkeeping (`LoopSystem`) |
+| `multizone` | One zone per geometry segment; exchange along loop edges (`MultiZoneSystem`) |
+
+Coordinates still do **not** enter the RHS (no 1D advection PDE yet). Volumes are scaled from geometric \(\pi r^2 L\) to match config role totals.

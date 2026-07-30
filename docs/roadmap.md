@@ -38,10 +38,22 @@
 
 See `docs/milestones/REPORT.md` for verification notes.
 
-## Beyond v1 (not scheduled here)
+## Milestone 6 — Multi-zone 0D
 
-- Multi-zone 0D
-- 1D loop discretization
+- Zone network from loop geometry
+- `simulation.model: multizone` dispatcher
+- Per-zone series + richer JSONL snapshots
+- Passive / driven multizone configs
+- Energy ledger closure on the zone network
+
+## Milestone 7 — 1D loop discretization (next)
+
+- Advective transport along segment centerlines
+- Map multi-zone state ↔ 1D cells
+- Keep EnergyLedger and snapshot contract
+
+## Beyond
+
 - Reduced MHD
 - Particle / Monte Carlo neutrons
 - Magnetic nozzle / propulsion config (separate product line)

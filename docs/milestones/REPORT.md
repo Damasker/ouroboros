@@ -41,3 +41,13 @@ Implemented: NoController, PIDController, SlowSupervisorController; fault YAMLs 
 **Status:** complete
 
 Implemented: `SimulationSession` API, `geometry/loop_geometry.json`, snapshot schema v1.0.0 JSONL, Makefile/Dockerfile/CI, docs/3d-visualization-roadmap.md.
+
+## Milestone 6 — Multi-zone 0D
+
+**Status:** complete
+
+Implemented: `ZoneNetwork` from geometry, `MultiZoneSystem`, `simulation.model` dispatcher (`lumped`|`multizone`), configs `multizone_passive` / `multizone_driven`, per-zone series, multi-segment snapshots, zone profile plot.
+
+Verified: particle conservation without sources; energy residual within tolerance on passive multizone; snapshots contain ≥8 segment IDs.
+
+Known issues: exchange rates remain phenomenological (`|v|/L`); dual-path velocities are still two ODEs (not a full 1D field); 1D advection deferred to Milestone 7.

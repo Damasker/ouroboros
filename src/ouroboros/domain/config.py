@@ -23,6 +23,7 @@ class SimulationSection(BaseModel):
     seed: int = 0
     strict_energy: bool = False
     scenario: str = "passive"
+    model: Literal["lumped", "multizone"] = "lumped"
 
 
 class GeometrySection(BaseModel):
@@ -123,6 +124,12 @@ class FaultSection(BaseModel):
     trip_energy_balance: bool = False
 
 
+class MultiZoneSection(BaseModel):
+    """Options for simulation.model == multizone."""
+
+    geometry_file: str | None = "geometry/loop_geometry.json"
+
+
 class SimulationConfig(BaseModel):
     simulation: SimulationSection = Field(default_factory=SimulationSection)
     geometry: GeometrySection = Field(default_factory=GeometrySection)
@@ -136,3 +143,4 @@ class SimulationConfig(BaseModel):
     numerics: NumericsSection = Field(default_factory=NumericsSection)
     drive: DriveSection = Field(default_factory=DriveSection)
     faults: FaultSection = Field(default_factory=FaultSection)
+    multizone: MultiZoneSection = Field(default_factory=MultiZoneSection)

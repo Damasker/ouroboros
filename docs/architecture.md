@@ -30,9 +30,9 @@
 | `ouroboros.units` | SI conversions (eV↔J, MeV, etc.) |
 | `ouroboros.domain` | Entities: PlasmaState, branches, chamber, throttles, ledger, config/result |
 | `ouroboros.physics` | Fusion, losses, throttle EM model (phenomenological) |
-| `ouroboros.core` | ODE RHS, integrator wrapper, constraints, events |
+| `ouroboros.core` | ODE RHS (`LoopSystem`, `MultiZoneSystem`), integrator, events |
 | `ouroboros.controllers` | NoController, PID, SlowSupervisor |
-| `ouroboros.geometry` | Spatial loop representation (nodes/segments) for visualization |
+| `ouroboros.geometry` | Spatial loop + `ZoneNetwork` builder for multi-zone 0D |
 | `ouroboros.io` | YAML config, CSV/JSON export, snapshot protocol |
 | `ouroboros.api` | Programmatic simulation control surface |
 | `ouroboros.viz` | 2D plots and schematic (depends on core **outputs only**) |

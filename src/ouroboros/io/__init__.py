@@ -94,43 +94,73 @@ def export_result_json(result: SimulationResult, path: str | Path) -> None:
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def _segments_from_sample(sample: dict[str, float]) -> list[dict[str, Any]]:
+    """Build segment list from lumped keys or multizone zone_* series."""
+    zone_ids = sorted(
+        {k.split("zone_density:", 1)[1] for k in sample if k.startswith("zone_density:")}
+    )
+    if zone_ids:
+        segs = []
+        for zid in zone_ids:
+            if zid.startswith("branch_a") or zid in ("feed_a", "throttle_a"):
+                vel = sample.get("flow_a", 0.0)
+            elif zid.startswith("branch_b") or zid in ("feed_b", "throttle_b"):
+                vel = sample.get("flow_b", 0.0)
+            else:
+                vel = 0.5 * (sample.get("flow_a", 0.0) + sample.get("flow_b", 0.0))
+            segs.append(
+                {
+                    "id": zid,
+                    "density": sample.get(f"zone_density:{zid}", 0.0),
+                    "temperature": sample.get(f"zone_temp_ev:{zid}", 0.0),
+                    "flow_velocity": vel,
+                    "magnetic_field": 0.0,
+                }
+            )
+        return segs
+    return [
+        {
+            "id": "branch_a",
+            "density": sample.get("density_a", 0.0),
+            "temperature": sample.get("temp_a_ev", 0.0),
+            "flow_velocity": sample.get("flow_a", 0.0),
+            "magnetic_field": 0.0,
+        },
+        {
+            "id": "branch_b",
+            "density": sample.get("density_b", 0.0),
+            "temperature": sample.get("temp_b_ev", 0.0),
+            "flow_velocity": sample.get("flow_b", 0.0),
+            "magnetic_field": 0.0,
+        },
+        {
+            "id": "reaction_chamber",
+            "density": sample.get("density_chamber", 0.0),
+            "temperature": sample.get("temp_chamber_ev", 0.0),
+            "flow_velocity": 0.0,
+            "magnetic_field": 0.0,
+        },
+        {
+            "id": "return_channel",
+            "density": 0.5 * (sample.get("density_a", 0.0) + sample.get("density_b", 0.0)),
+            "temperature": 0.5 * (sample.get("temp_a_ev", 0.0) + sample.get("temp_b_ev", 0.0)),
+            "flow_velocity": 0.5 * (sample.get("flow_a", 0.0) + sample.get("flow_b", 0.0)),
+            "magnetic_field": 0.0,
+        },
+    ]
+
+
 def build_snapshot_frame(
-    time_s: float, sample: dict[str, float], components_status: dict[str, str]
+    time_s: float,
+    sample: dict[str, float],
+    components_status: dict[str, str],
+    segments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Versioned snapshot for external 3D clients."""
     return {
         "snapshot_schema_version": SNAPSHOT_SCHEMA_VERSION,
         "time": time_s,
-        "segments": [
-            {
-                "id": "branch_a",
-                "density": sample.get("density_a", 0.0),
-                "temperature": sample.get("temp_a_ev", 0.0),
-                "flow_velocity": sample.get("flow_a", 0.0),
-                "magnetic_field": 0.0,
-            },
-            {
-                "id": "branch_b",
-                "density": sample.get("density_b", 0.0),
-                "temperature": sample.get("temp_b_ev", 0.0),
-                "flow_velocity": sample.get("flow_b", 0.0),
-                "magnetic_field": 0.0,
-            },
-            {
-                "id": "reaction_chamber",
-                "density": sample.get("density_chamber", 0.0),
-                "temperature": sample.get("temp_chamber_ev", 0.0),
-                "flow_velocity": 0.0,
-                "magnetic_field": 0.0,
-            },
-            {
-                "id": "return_channel",
-                "density": 0.5 * (sample.get("density_a", 0.0) + sample.get("density_b", 0.0)),
-                "temperature": 0.5 * (sample.get("temp_a_ev", 0.0) + sample.get("temp_b_ev", 0.0)),
-                "flow_velocity": 0.5 * (sample.get("flow_a", 0.0) + sample.get("flow_b", 0.0)),
-                "magnetic_field": 0.0,
-            },
-        ],
+        "segments": segments if segments is not None else _segments_from_sample(sample),
         "components": [
             {
                 "id": "throttle_a",
@@ -151,10 +181,15 @@ def build_snapshot_frame(
 def export_snapshots_jsonl(result: SimulationResult, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    final_segs = result.metadata.get("final_zone_segments")
     with path.open("w", encoding="utf-8") as f:
         for i, t in enumerate(result.times_s):
             sample = {k: result.series[k][i] for k in result.series}
-            frame = build_snapshot_frame(t, sample, {})
+            # Prefer series-derived segments; fall back to final metadata frame shape
+            segs = _segments_from_sample(sample)
+            if len(segs) <= 4 and final_segs and i == len(result.times_s) - 1:
+                segs = final_segs
+            frame = build_snapshot_frame(t, sample, {}, segments=segs)
             f.write(json.dumps(frame) + "\n")
 
 
