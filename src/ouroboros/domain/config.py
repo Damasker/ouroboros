@@ -90,11 +90,16 @@ class LossesSection(BaseModel):
 
 
 class ReducedMHDSection(BaseModel):
-    """Placeholder reduced-MHD-like forces (not a real MHD model)."""
+    """Reduced-MHD-like forces (Milestone 8 stubs → Milestone 10 energy-aware)."""
 
     enabled: bool = False
     magnetic_pressure_scale: float = 0.0
     alfven_damping_fraction: float = 0.0
+    # Hydrodynamic Δp·A along paths (return/branch → chamber)
+    pressure_drive: bool = False
+    pressure_drive_scale: float = 1.0
+    # Exchange mp + Δp work with plasma internal energy (keeps ledger closed)
+    compressional_exchange: bool = True
 
 
 class ControllerSection(BaseModel):

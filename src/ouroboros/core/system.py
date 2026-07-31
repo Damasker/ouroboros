@@ -475,7 +475,17 @@ class LoopSystem:
 
         from ouroboros.core.dynamics import dual_path_throttle_step
 
-        da, db, p_mhd_diss = dual_path_throttle_step(
+        temp_a = _temperature_from_energy(n_a, u_a, va_vol)
+        temp_b = _temperature_from_energy(n_b, u_b, vb_vol)
+        vr = cfg.geometry.return_channel_volume_m3
+        dens_r = n_r / max(vr, 1e-30)
+        temp_r = _temperature_from_energy(n_r, u_r, vr)
+        p_a = pressure_pa(dens_a, temp_a, dens_a, temp_a)
+        p_b = pressure_pa(dens_b, temp_b, dens_b, temp_b)
+        p_c = pressure_pa(dens_c, temp_c, dens_c, temp_c)
+        p_r = pressure_pa(dens_r, temp_r, dens_r, temp_r)
+
+        step = dual_path_throttle_step(
             cfg=cfg,
             v_a=v_a,
             v_b=v_b,
@@ -485,13 +495,19 @@ class LoopSystem:
             dens_b=dens_b,
             resistance_a=ra,
             resistance_b=rb,
+            p_a_pa=p_a,
+            p_b_pa=p_b,
+            p_c_pa=p_c,
+            p_r_pa=p_r,
         )
+        da, db = step.path_a, step.path_b
         dydt[IDX_V_A] = da.dv_dt
         dydt[IDX_V_B] = db.dv_dt
         dydt[IDX_I_A] = da.dI_dt
         dydt[IDX_I_B] = db.dI_dt
+        dydt[IDX_U_C] += step.plasma_heating_w
 
-        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + p_mhd_diss
+        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + step.dissipative_power_w
         p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         # Limit checks
@@ -569,6 +585,10 @@ class LoopSystem:
                 **dict(self._control.metadata),
                 "blanket_coolant_w": bpow.coolant_extract_w,
                 "neutron_leak_w": bpow.leaked_w,
+                "mhd_dissipative_w": step.dissipative_power_w,
+                "mhd_plasma_heating_w": step.plasma_heating_w,
+                "mhd_force_a_n": step.mhd.force_a_n,
+                "mhd_force_b_n": step.mhd.force_b_n,
             },
         )
         return dydt

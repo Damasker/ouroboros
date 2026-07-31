@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.physics.coupling import PathThrottleDerivatives, path_throttle_rhs
-from ouroboros.physics.reduced_mhd import compute_reduced_mhd_forces
+from ouroboros.physics.reduced_mhd import ReducedMHDForces, compute_reduced_mhd_forces
 
 
 def loss_kwargs(cfg: SimulationConfig) -> dict[str, Any]:
@@ -15,6 +16,15 @@ def loss_kwargs(cfg: SimulationConfig) -> dict[str, Any]:
         "tau_parallel_s": cfg.losses.tau_parallel_s,
         "tau_perp_s": cfg.losses.tau_perp_s,
     }
+
+
+@dataclass(frozen=True)
+class DualPathStep:
+    path_a: PathThrottleDerivatives
+    path_b: PathThrottleDerivatives
+    dissipative_power_w: float
+    plasma_heating_w: float  # added to chamber internal energy when compressional_exchange
+    mhd: ReducedMHDForces
 
 
 def dual_path_throttle_step(
@@ -28,12 +38,16 @@ def dual_path_throttle_step(
     dens_b: float,
     resistance_a: float,
     resistance_b: float,
-) -> tuple[PathThrottleDerivatives, PathThrottleDerivatives, float]:
+    p_a_pa: float = 0.0,
+    p_b_pa: float = 0.0,
+    p_c_pa: float = 0.0,
+    p_r_pa: float = 0.0,
+) -> DualPathStep:
     """
-    Compute momentum/throttle derivatives for paths A/B including optional reduced-MHD stubs.
+    Momentum/throttle derivatives for paths A/B including reduced-MHD channels.
 
-    Returns (deriv_a, deriv_b, extra_dissipation_w) where extra_dissipation is Alfvén-like
-    damping power accumulated into the friction ledger channel.
+    Dissipative Alfvén power → friction ledger.
+    Magnetic-pressure + Δp·A work → plasma internal energy when compressional_exchange.
     """
     mhd = compute_reduced_mhd_forces(
         v_a=v_a,
@@ -49,6 +63,12 @@ def dual_path_throttle_step(
         enabled=cfg.reduced_mhd.enabled,
         magnetic_pressure_scale=cfg.reduced_mhd.magnetic_pressure_scale,
         alfven_damping_fraction=cfg.reduced_mhd.alfven_damping_fraction,
+        pressure_drive=cfg.reduced_mhd.pressure_drive,
+        pressure_drive_scale=cfg.reduced_mhd.pressure_drive_scale,
+        p_a_pa=p_a_pa,
+        p_b_pa=p_b_pa,
+        p_c_pa=p_c_pa,
+        p_r_pa=p_r_pa,
     )
     f_other_a = cfg.drive.drive_force_a_n - cfg.plasma.friction_coeff_kg_s * v_a + mhd.force_a_n
     f_other_b = cfg.drive.drive_force_b_n - cfg.plasma.friction_coeff_kg_s * v_b + mhd.force_b_n
@@ -76,9 +96,15 @@ def dual_path_throttle_step(
         coupling_force_coeff_n_per_a=cfg.throttle_b.coupling_force_coeff_n_per_a,
         mutual_inductance_h=cfg.throttle_b.mutual_inductance_h,
     )
-    # Alfvén drag power ≈ -F_drag·v when F_drag is the damping part; approximate via
-    # total MHD force when pressure scale is 0 (default).
-    p_mhd = -(mhd.force_a_n * v_a + mhd.force_b_n * v_b)
-    # Only count dissipative (positive) contribution
-    p_mhd = max(p_mhd, 0.0)
-    return da, db, p_mhd
+    p_diss = mhd.dissipative_power_w(v_a, v_b)
+    if cfg.reduced_mhd.enabled and cfg.reduced_mhd.compressional_exchange:
+        p_heat = mhd.exchange_power_to_internal_w(v_a, v_b)
+    else:
+        # Legacy: count non-dissipative MHD work as friction-like loss when positive
+        p_extra = -(mhd.force_mp_a_n * v_a + mhd.force_mp_b_n * v_b)
+        p_extra += -(mhd.force_pressure_a_n * v_a + mhd.force_pressure_b_n * v_b)
+        p_diss = p_diss + max(p_extra, 0.0)
+        p_heat = 0.0
+    return DualPathStep(
+        path_a=da, path_b=db, dissipative_power_w=p_diss, plasma_heating_w=p_heat, mhd=mhd
+    )

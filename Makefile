@@ -55,6 +55,8 @@ demo: setup
 	$(MAKE) visualize RUN=coupled-consistent
 	$(MAKE) run-scenario SCENARIO=dt-blanket
 	$(MAKE) report RUN=dt-blanket
+	$(MAKE) run-scenario SCENARIO=reduced-mhd
+	$(MAKE) report RUN=reduced-mhd
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

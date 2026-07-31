@@ -27,6 +27,7 @@ SCENARIO_CONFIGS = {
     "coupled-consistent": "configs/coupled_consistent.yaml",
     "multizone-dt": "configs/multizone_dt.yaml",
     "oned-dt": "configs/oned_dt.yaml",
+    "reduced-mhd": "configs/reduced_mhd.yaml",
     "fault-block-a": "configs/faults/block_branch_a.yaml",
     "fault-quench": "configs/faults/quench.yaml",
     "fault-heater-trip": "configs/faults/heater_trip.yaml",

@@ -17,6 +17,7 @@ Statements are classified so that research honesty is preserved.
 - Linear friction drag on flow.
 - Bremsstrahlung formula with effective charge correction, not full atomic physics.
 - Constant zone volumes (no MHD equilibrium solver).
+- Reduced-MHD-like path forces with compressional kin↔int exchange (Milestone 10) — not wave MHD.
 
 ## Phenomenological model
 

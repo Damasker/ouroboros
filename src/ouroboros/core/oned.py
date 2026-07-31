@@ -33,6 +33,7 @@ from ouroboros.units import (
     DT_NEUTRON_J,
     ev_to_kelvin,
     kelvin_to_ev,
+    pressure_pa,
     thermal_energy_joule,
 )
 
@@ -370,7 +371,19 @@ class OneDSystem:
 
         from ouroboros.core.dynamics import dual_path_throttle_step
 
-        da, db, p_mhd_diss = dual_path_throttle_step(
+        def zone_pressure(zid: str, fallback: float) -> float:
+            dens_z, temp_ev = self._zone_mean(y, zid)
+            if dens_z <= 0.0:
+                return fallback
+            t_k = ev_to_kelvin(temp_ev)
+            return pressure_pa(dens_z, t_k, dens_z, t_k)
+
+        p_c = pressure_pa(dens_c, temp_c, dens_c, temp_c) if dens_c > 0 else 0.0
+        p_a = zone_pressure("branch_a", p_c)
+        p_b = zone_pressure("branch_b", p_c)
+        p_r = zone_pressure("return_channel", p_c)
+
+        step = dual_path_throttle_step(
             cfg=cfg,
             v_a=v_a,
             v_b=v_b,
@@ -380,16 +393,27 @@ class OneDSystem:
             dens_b=dens_b,
             resistance_a=ra,
             resistance_b=rb,
+            p_a_pa=p_a,
+            p_b_pa=p_b,
+            p_c_pa=p_c,
+            p_r_pa=p_r,
         )
+        da, db = step.path_a, step.path_b
         dydt[L.idx_v_a] = da.dv_dt
         dydt[L.idx_v_b] = db.dv_dt
         dydt[L.idx_i_a] = da.dI_dt
         dydt[L.idx_i_b] = db.dI_dt
+        if ch_cells and step.plasma_heating_w != 0.0:
+            share = step.plasma_heating_w / len(ch_cells)
+            for ci in ch_cells:
+                dydt[L.idx_u(ci)] += share
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
 
         p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
-        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + p_mhd_diss
+        p_friction = (
+            cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + step.dissipative_power_w
+        )
         p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         dydt[L.idx_acc_ext] = p_ext + p_syn
@@ -426,6 +450,8 @@ class OneDSystem:
                 **dict(self._control.metadata),
                 "blanket_coolant_w": bpow.coolant_extract_w,
                 "neutron_leak_w": bpow.leaked_w,
+                "mhd_dissipative_w": step.dissipative_power_w,
+                "mhd_plasma_heating_w": step.plasma_heating_w,
             },
         )
         return dydt

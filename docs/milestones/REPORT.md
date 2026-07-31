@@ -81,3 +81,13 @@ Implemented: dynamic blanket ODE (`physics/blanket.py`) with capture/leak/coolan
 Verified: dynamic-blanket energy closure (produced ≈ leak + coolant + \(E_b\)); legacy path unchanged when blanket off; campaign + HTTP smoke tests.
 
 Known issues: TBR is a placeholder rate, not inventory transport; HTTP server is read-only and unauthenticated.
+
+## Milestone 10 — Energy-consistent reduced MHD
+
+**Status:** complete
+
+Implemented: force-channel split in `physics/reduced_mhd.py` (Alfvén drag → friction ledger; magnetic-pressure stiffness + hydrodynamic \(\Delta p\,A\) → chamber internal energy via compressional exchange); `DualPathStep` return type; wired into lumped / multizone / 1D; config `reduced_mhd`.
+
+Verified: energy residual trusted with nonzero `magnetic_pressure_scale` when `compressional_exchange: true`; unit tests for force signs and exchange identity.
+
+Known issues: still not a real MHD solver (no waves, no cell-local \(\mathbf{v}\)); pressure drive is lumped phenomenological.

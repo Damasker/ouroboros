@@ -107,6 +107,24 @@ Units: \(k_{\mathrm{em}}\) in N/A = V/(m/s). Then \(\frac{d}{dt}(E_{\mathrm{kin}
 
 Legacy `phenomenological` mode (independent force coeff + \(M dI_p/dt\)) remains available but may leave a ledger residual.
 
+## 4c. Reduced-MHD-like forces (Milestone 10)
+
+Split path forces (classification: phenomenological / simplified):
+
+1. **Alfvén-like drag** \(F_{\mathrm{d}}=-f\rho v_A v\) → dissipative; power \(\max(-F_{\mathrm{d}}v,0)\) enters the friction ledger channel.
+2. **Magnetic-pressure stiffness** \(F_{\mathrm{mp}}=-\mathrm{scale}\,(B^2/2\mu_0)\,A\,\tanh(v/v_0)\) with \(B\sim\mu_0 n I\).
+3. **Hydrodynamic \(\Delta p\,A\)** \(F_p=\kappa(p_{\mathrm{up}}-p_{\mathrm{down}})A\).
+
+When `compressional_exchange: true`, channels (2)–(3) exchange with plasma internal energy:
+
+\[
+P_{\mathrm{heat}}=-(F_{\mathrm{mp}}+F_p)\cdot v
+\quad\Rightarrow\quad
+\frac{d}{dt}(E_{\mathrm{kin}}+E_{\mathrm{int}})=0
+\]
+
+from these forces alone (Alfvén drag still leaves via the ledger). Disable exchange only for legacy comparisons — residual may grow.
+
 ## 5. D–T fusion
 
 \[

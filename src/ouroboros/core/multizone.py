@@ -34,6 +34,7 @@ from ouroboros.units import (
     DT_NEUTRON_J,
     ev_to_kelvin,
     kelvin_to_ev,
+    pressure_pa,
     thermal_energy_joule,
 )
 
@@ -381,7 +382,21 @@ class MultiZoneSystem:
 
         from ouroboros.core.dynamics import dual_path_throttle_step
 
-        da, db, p_mhd_diss = dual_path_throttle_step(
+        def zone_pressure(zid: str, fallback: float) -> float:
+            if zid not in net.zone_index:
+                return fallback
+            zi = net.zone_index[zid]
+            z = net.zones[zi]
+            dens = Ns[zi] / z.volume_m3
+            temp = _temperature_from_energy(Ns[zi], Us[zi], z.volume_m3)
+            return pressure_pa(dens, temp, dens, temp)
+
+        p_c = pressure_pa(dens_c, temp_c, dens_c, temp_c)
+        p_a = zone_pressure("branch_a", p_c)
+        p_b = zone_pressure("branch_b", p_c)
+        p_r = zone_pressure("return_channel", p_c)
+
+        step = dual_path_throttle_step(
             cfg=cfg,
             v_a=v_a,
             v_b=v_b,
@@ -391,18 +406,26 @@ class MultiZoneSystem:
             dens_b=dens_b,
             resistance_a=ra,
             resistance_b=rb,
+            p_a_pa=p_a,
+            p_b_pa=p_b,
+            p_c_pa=p_c,
+            p_r_pa=p_r,
         )
+        da, db = step.path_a, step.path_b
         dydt[L.idx_v_a] = da.dv_dt
         dydt[L.idx_v_b] = db.dv_dt
         dydt[L.idx_i_a] = da.dI_dt
         dydt[L.idx_i_b] = db.dI_dt
+        dydt[L.idx_u(ch_i)] += step.plasma_heating_w
         self.throttle_a.current_a = i_a
         self.throttle_b.current_a = i_b
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
 
         p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
-        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + p_mhd_diss
+        p_friction = (
+            cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + step.dissipative_power_w
+        )
         p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         dydt[L.idx_acc_ext] = p_ext + p_syn
@@ -439,6 +462,8 @@ class MultiZoneSystem:
                 **dict(self._control.metadata),
                 "blanket_coolant_w": bpow.coolant_extract_w,
                 "neutron_leak_w": bpow.leaked_w,
+                "mhd_dissipative_w": step.dissipative_power_w,
+                "mhd_plasma_heating_w": step.plasma_heating_w,
             },
         )
         return dydt

@@ -67,8 +67,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Parametric campaign runner (`make campaign`)
 - Stdlib HTTP snapshot server (`make serve`)
 
+## Milestone 10 — Energy-consistent reduced MHD
+
+- Split reduced-MHD forces: Alfvén drag (ledger) vs magnetic pressure + \(\Delta p\,A\) (compressional exchange)
+- Nonzero `magnetic_pressure_scale` with trusted EnergyLedger when `compressional_exchange: true`
+- Demo config `reduced_mhd`
+
 ## Beyond
 
-- Full reduced MHD
+- Full reduced MHD / cell-local momentum field
 - Particle / Monte Carlo neutrons
+- 3D visualization client on snapshot API
 - Magnetic nozzle / propulsion config (separate product line)

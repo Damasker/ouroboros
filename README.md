@@ -51,6 +51,7 @@ make run-scenario SCENARIO=coupled-consistent
 make run-scenario SCENARIO=multizone-dt
 make run-scenario SCENARIO=oned-dt
 make run-scenario SCENARIO=dt-blanket
+make run-scenario SCENARIO=reduced-mhd
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
