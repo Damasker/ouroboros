@@ -148,6 +148,12 @@ def make_handler(
                 self._send(200, json.loads(geom.read_text(encoding="utf-8")))
                 return
 
+            if path == "/client/protocol":
+                from ouroboros.io.client_bridge import protocol_manifest
+
+                self._send(200, protocol_manifest())
+                return
+
             if path == "/runs":
                 self._send(200, {"runs": _list_runs(root)})
                 return
@@ -205,6 +211,18 @@ def make_handler(
                         self._not_found("timeseries.csv")
                         return
                     self._send(200, fp.read_bytes(), content_type="text/csv; charset=utf-8")
+                    return
+
+                if resource == "client-stream":
+                    fp = run_dir / "client_stream.jsonl"
+                    if not fp.exists():
+                        self._not_found("client_stream.jsonl")
+                        return
+                    frames = _read_jsonl(fp)
+                    self._send(
+                        200,
+                        {"run_id": run_id, "protocol": "ouroboros.client", "frames": frames},
+                    )
                     return
 
             self._not_found(path)

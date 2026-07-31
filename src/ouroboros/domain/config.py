@@ -164,13 +164,21 @@ class OneDSection(BaseModel):
     # Milestone 14: upwind momentum flux (cell_velocity only)
     momentum_flux: bool = False
     thermalize_momentum_flux: bool = True
-    # Milestone 15–19: none | rusanov | hllc | roe (replaces cell_grad_p + upwind when set)
-    riemann: Literal["none", "rusanov", "hllc", "roe"] = "none"
+    # Milestone 15–23: none | rusanov | hllc | roe | hlld
+    riemann: Literal["none", "rusanov", "hllc", "roe", "hlld"] = "none"
     # Milestone 17+: total-energy flux (requires riemann != none); solver follows riemann
     riemann_energy: bool = False
-    # Milestone 19: augment Riemann pressures with B²/2μ₀ (fast-wave-like)
+    # Milestone 19/23: augment Riemann pressures with B²/2μ₀ (fast-wave / HLLD)
     wave_mhd: bool = False
     wave_mhd_scale: float = 1.0
+
+
+class BlanketLayerConfig(BaseModel):
+    """CAD-proxy blanket layer (Milestone 24)."""
+
+    name: str = "layer"
+    optical_depth: float = 1.0
+    capture_weight: float = 1.0
 
 
 class BlanketSection(BaseModel):
@@ -181,11 +189,12 @@ class BlanketSection(BaseModel):
     coolant_time_s: float = 0.5
     breeding_ratio: float = 1.05  # placeholder TBR
     initial_thermal_energy_j: float = 0.0
-    # Milestone 20: lumped | mc (MC estimates capture from optical depth)
-    transport: Literal["lumped", "mc"] = "lumped"
+    # Milestone 20/24: lumped | mc | zones
+    transport: Literal["lumped", "mc", "zones"] = "lumped"
     mc_optical_depth: float = 2.0
     mc_particles: int = 64
     mc_seed: int = 42
+    layers: list[BlanketLayerConfig] = Field(default_factory=list)
 
 
 class NozzleSection(BaseModel):
@@ -203,12 +212,19 @@ class NozzleSection(BaseModel):
 
 
 class SpacecraftSection(BaseModel):
-    """1D rocket / Δv post-processing from nozzle thrust (Milestone 22)."""
+    """Rocket / Δv / optional 3DOF orbit from nozzle thrust (Milestones 22/26)."""
 
     enabled: bool = False
     dry_mass_kg: float = 500.0
     wet_mass_kg: float = 800.0
     include_thrust_accel: bool = True
+    # Milestone 26: planar orbit (central gravity)
+    orbit_3dof: bool = False
+    gravity_mu_m3_s2: float = 3.986004418e14  # Earth μ
+    initial_x_m: float = 6.778e6  # ~LEO
+    initial_y_m: float = 0.0
+    initial_vx_m_s: float = 0.0
+    initial_vy_m_s: float = 7.67e3
 
 
 class SimulationConfig(BaseModel):

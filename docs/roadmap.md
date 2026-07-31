@@ -143,9 +143,29 @@ See `docs/milestones/REPORT.md` for verification notes.
 - `spacecraft` post-process: mass, \(\Delta v\), acceleration series
 - Config `nozzle_trajectory`
 
+## Milestone 23 — HLLD proxy
+
+- `oned.riemann: hlld` — fast / Alfvén / contact waves with \(p_{\mathrm{mag}}\)
+- Config `oned_hlld`
+
+## Milestone 24 — Multi-layer CAD-proxy neutronics
+
+- `blanket.transport: zones` — ray-march MC through layered optical depths
+- Config `dt_blanket_zones`
+
+## Milestone 25 — Native client bridge
+
+- Protocol `ouroboros.client` + `client_stream.jsonl`
+- Godot/Unity stubs in `clients/`; HTTP `/client/protocol`, `/runs/{id}/client-stream`
+
+## Milestone 26 — Planar 3DOF orbit
+
+- `spacecraft.orbit_3dof` — central gravity + thrust along velocity
+- Series `orbit_x/y`, `orbit_vx/vy`, `orbit_radius_m`; config `orbit_3dof`
+
 ## Beyond (future)
 
-- Full HLLD / multi-D MHD
-- Production neutronics / CAD blanket
-- Native Godot/Unity client
-- 3DOF/6DOF orbital mechanics
+- Multi-D MHD / production HLLD
+- OpenMC/CAD imported blankets
+- Full engine plugins with live WebSocket
+- 6DOF attitude + ephemeris

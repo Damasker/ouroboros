@@ -504,6 +504,8 @@ class OneDSystem:
             from ouroboros.physics.momentum import (
                 CellPressureForces,
                 cell_grad_p_forces,
+                hlld_energy_flux,
+                hlld_momentum_flux,
                 hllc_energy_flux,
                 hllc_momentum_flux,
                 roe_energy_flux,
@@ -516,18 +518,21 @@ class OneDSystem:
 
             masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
             vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
-            use_riemann = cfg.oned.riemann in ("rusanov", "hllc", "roe")
+            use_riemann = cfg.oned.riemann in ("rusanov", "hllc", "roe", "hlld")
 
-            # Wave-MHD: add B²/2μ₀ into effective pressure seen by Riemann
+            # Wave-MHD / HLLD: B²/2μ₀ into effective pressure (+ separate p_mag list)
             riemann_pressures = list(cell_pressures)
-            if use_riemann and cfg.oned.wave_mhd:
+            p_mag_list = [0.0] * L.n_cells
+            if use_riemann and (cfg.oned.wave_mhd or cfg.oned.riemann == "hlld"):
                 turns = 0.5 * (
                     cfg.throttle_a.coil_turns_per_metre + cfg.throttle_b.coil_turns_per_metre
                 )
                 b = MU0 * turns * 0.5 * (abs(i_a) + abs(i_b))
                 p_mag = cfg.oned.wave_mhd_scale * (b * b) / (2.0 * MU0)
-                kappa = max(cfg.oned.pressure_force_scale, 1e-30)
-                riemann_pressures = [p + p_mag / kappa for p in cell_pressures]
+                p_mag_list = [p_mag] * L.n_cells
+                if cfg.oned.wave_mhd and cfg.oned.riemann != "hlld":
+                    kappa = max(cfg.oned.pressure_force_scale, 1e-30)
+                    riemann_pressures = [p + p_mag / kappa for p in cell_pressures]
 
             if use_riemann:
                 gpf = CellPressureForces(
@@ -573,6 +578,10 @@ class OneDSystem:
                 mflux = hllc_momentum_flux(**m_kwargs)
             elif cfg.oned.riemann == "roe":
                 mflux = roe_momentum_flux(**m_kwargs)
+            elif cfg.oned.riemann == "hlld":
+                mflux = hlld_momentum_flux(
+                    **m_kwargs, magnetic_pressures_pa=p_mag_list
+                )
             elif cfg.oned.riemann == "rusanov":
                 mflux = rusanov_momentum_flux(**m_kwargs)
             else:
@@ -600,6 +609,10 @@ class OneDSystem:
                     eflux = hllc_energy_flux(**e_kwargs)
                 elif cfg.oned.riemann == "roe":
                     eflux = roe_energy_flux(**e_kwargs)
+                elif cfg.oned.riemann == "hlld":
+                    eflux = hlld_energy_flux(
+                        **e_kwargs, magnetic_pressures_pa=p_mag_list
+                    )
                 else:
                     eflux = rusanov_energy_flux(**e_kwargs)
                 for i in range(L.n_cells):

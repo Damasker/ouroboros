@@ -150,16 +150,28 @@ def run_simulation(
     for k in SERIES_KEYS:
         series.setdefault(k, [float("nan")] * len(times))
 
-    # Milestone 22: rocket Δv post-process (outside plasma energy ledger)
+    # Milestone 22/26: rocket Δv / optional 3DOF orbit (outside plasma ledger)
     if config.spacecraft.enabled and times:
-        from ouroboros.physics.trajectory import integrate_trajectory_series
+        thrust = series.get("thrust_n", [0.0] * len(times))
+        mdot = series.get("nozzle_mass_flow_kg_s", [0.0] * len(times))
+        if config.spacecraft.orbit_3dof:
+            from ouroboros.physics.orbit3dof import integrate_orbit3dof_series
 
-        traj = integrate_trajectory_series(
-            times_s=times,
-            thrust_n=series.get("thrust_n", [0.0] * len(times)),
-            mass_flow_kg_s=series.get("nozzle_mass_flow_kg_s", [0.0] * len(times)),
-            spacecraft=config.spacecraft,
-        )
+            traj = integrate_orbit3dof_series(
+                times_s=times,
+                thrust_n=thrust,
+                mass_flow_kg_s=mdot,
+                spacecraft=config.spacecraft,
+            )
+        else:
+            from ouroboros.physics.trajectory import integrate_trajectory_series
+
+            traj = integrate_trajectory_series(
+                times_s=times,
+                thrust_n=thrust,
+                mass_flow_kg_s=mdot,
+                spacecraft=config.spacecraft,
+            )
         series.update(traj)
 
     y_final = sol.y[:, len(times) - 1] if times else y0

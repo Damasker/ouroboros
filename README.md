@@ -64,9 +64,14 @@ make run-scenario SCENARIO=oned-roe
 make run-scenario SCENARIO=oned-wave-mhd
 make run-scenario SCENARIO=dt-blanket-mc
 make run-scenario SCENARIO=nozzle-trajectory
+make run-scenario SCENARIO=oned-hlld
+make run-scenario SCENARIO=dt-blanket-zones
+make run-scenario SCENARIO=orbit-3dof
 ```
 
 WebGPU volumetric viewer: `http://127.0.0.1:8765/viewer/webgpu.html` (falls back to canvas if WebGPU is unavailable).
+
+Native clients: `clients/godot/`, `clients/unity/`; protocol at `/client/protocol`, stream at `/runs/<id>/client-stream`.
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
 

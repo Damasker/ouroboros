@@ -237,6 +237,20 @@ v_{\mathrm{ex}}=(1-\beta)v_{\mathrm{mag}}+\beta\,\eta\,v_{\mathrm{id}}.
 
 Spacecraft: \(\dot m=- \dot m_{\mathrm{noz}}\), \(\dot{(\Delta v)}=T/m\) (post-processed series).
 
+## 4o. HLLD proxy (Milestone 23)
+
+Total pressure \(p_t=\kappa p+p_{\mathrm{mag}}\), \(c_f=\sqrt{c_s^2+v_A^2}\), Alfvén \(S_M\pm v_A\), contact \(S_M\). Classification: phenomenological HLLD.
+
+## 4p. Layered neutronics (Milestone 24)
+
+Ray-march through layers \(\{\tau_i\}\); absorption attributed to stopping layer. Capture fraction feeds blanket ODE.
+
+## 4q. Planar 3DOF orbit (Milestone 26)
+
+\[
+\ddot{\mathbf r}=-\mu\frac{\mathbf r}{r^3}+\frac{T}{m}\hat{\mathbf v},\qquad \dot m=-\dot m_{\mathrm{noz}}.
+\]
+
 ## 5. D–T fusion
 
 \[

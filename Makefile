@@ -69,6 +69,9 @@ demo: setup
 	$(MAKE) run-scenario SCENARIO=oned-wave-mhd
 	$(MAKE) run-scenario SCENARIO=dt-blanket-mc
 	$(MAKE) run-scenario SCENARIO=nozzle-trajectory
+	$(MAKE) run-scenario SCENARIO=oned-hlld
+	$(MAKE) run-scenario SCENARIO=dt-blanket-zones
+	$(MAKE) run-scenario SCENARIO=orbit-3dof
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

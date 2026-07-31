@@ -104,6 +104,11 @@ SERIES_KEYS = [
     "spacecraft_mass_kg",
     "delta_v_m_s",
     "acceleration_m_s2",
+    "orbit_x_m",
+    "orbit_y_m",
+    "orbit_vx_m_s",
+    "orbit_vy_m_s",
+    "orbit_radius_m",
 ]
 
 

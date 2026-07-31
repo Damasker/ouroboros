@@ -217,6 +217,45 @@ def export_snapshots_jsonl(result: SimulationResult, path: str | Path) -> None:
             f.write(json.dumps(frame) + "\n")
 
 
+def export_client_stream_jsonl(result: SimulationResult, path: str | Path) -> None:
+    """Milestone 25: Godot/Unity-oriented JSONL stream."""
+    from ouroboros.io.client_bridge import build_client_frame, write_client_stream
+
+    path = Path(path)
+    final_segs = result.metadata.get("final_zone_segments")
+    final_cells = result.metadata.get("final_cells")
+    frames: list[dict] = []
+    for i, t in enumerate(result.times_s):
+        sample = {k: result.series[k][i] for k in result.series}
+        segs = _segments_from_sample(sample)
+        if len(segs) <= 4 and final_segs and i == len(result.times_s) - 1:
+            segs = final_segs
+        cells = final_cells if (final_cells and i == len(result.times_s) - 1) else []
+        craft = {
+            "mass_kg": sample.get("spacecraft_mass_kg"),
+            "delta_v_m_s": sample.get("delta_v_m_s"),
+            "x_m": sample.get("orbit_x_m"),
+            "y_m": sample.get("orbit_y_m"),
+            "vx_m_s": sample.get("orbit_vx_m_s"),
+            "vy_m_s": sample.get("orbit_vy_m_s"),
+        }
+        components = [
+            {"id": "throttle_a", "current": sample.get("current_throttle_a", 0.0)},
+            {"id": "throttle_b", "current": sample.get("current_throttle_b", 0.0)},
+        ]
+        frames.append(
+            build_client_frame(
+                run_id=result.run_id,
+                time_s=t,
+                segments=segs,
+                components=components,
+                cells=cells or [],
+                spacecraft=craft,
+            )
+        )
+    write_client_stream(frames, path)
+
+
 def write_run_directory(result: SimulationResult, root: str | Path) -> Path:
     root = Path(root)
     run_dir = root / result.run_id
@@ -227,5 +266,6 @@ def write_run_directory(result: SimulationResult, root: str | Path) -> Path:
     export_events(result, run_dir / "events.json")
     export_result_json(result, run_dir / "result.json")
     export_snapshots_jsonl(result, run_dir / "snapshots.jsonl")
+    export_client_stream_jsonl(result, run_dir / "client_stream.jsonl")
     logger.info("Wrote run artifacts to %s", run_dir)
     return run_dir

@@ -6,12 +6,30 @@ from ouroboros.domain import EnergyLedger
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.physics.blanket import BlanketPowers, blanket_rhs
 from ouroboros.physics.neutron_mc import mc_neutron_capture_fraction
+from ouroboros.physics.neutronics_zones import (
+    BlanketLayer,
+    default_cad_proxy_layers,
+    zone_mc_capture,
+)
 
 
 def _capture_fraction(cfg: SimulationConfig) -> float:
     if cfg.blanket.transport == "mc":
         return mc_neutron_capture_fraction(
             optical_depth=cfg.blanket.mc_optical_depth,
+            n_particles=cfg.blanket.mc_particles,
+            seed=cfg.blanket.mc_seed,
+        ).capture_fraction
+    if cfg.blanket.transport == "zones":
+        if cfg.blanket.layers:
+            layers = [
+                BlanketLayer(L.name, L.optical_depth, L.capture_weight)
+                for L in cfg.blanket.layers
+            ]
+        else:
+            layers = default_cad_proxy_layers()
+        return zone_mc_capture(
+            layers,
             n_particles=cfg.blanket.mc_particles,
             seed=cfg.blanket.mc_seed,
         ).capture_fraction

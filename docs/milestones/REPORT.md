@@ -211,3 +211,43 @@ Implemented: ideal-expansion blend on nozzle; `spacecraft` section; `integrate_t
 Verified: energy identity on nozzle channels; trajectory \(\Delta v\) monotonic; scenario trusted.
 
 Known issues: 1D rocket equation only — not orbital 6DOF.
+
+## Milestone 23 — HLLD proxy
+
+**Status:** complete
+
+Implemented: `hlld_momentum_flux` / `hlld_energy_flux` with fast/Alfvén/contact; `oned.riemann: hlld`; config `oned_hlld`.
+
+Verified: energy identity; short trusted 1D run.
+
+Known issues: phenomenological HLLD — not Miyoshi–Kusano / multi-D MHD.
+
+## Milestone 24 — Multi-layer CAD-proxy neutronics
+
+**Status:** complete
+
+Implemented: `zone_mc_capture` layered ray-march; `blanket.transport: zones` + `layers`; config `dt_blanket_zones`.
+
+Verified: deterministic deposits; DT zones run energy-trusted.
+
+Known issues: not OpenMC/CAD BREP import.
+
+## Milestone 25 — Native client bridge
+
+**Status:** complete
+
+Implemented: `ouroboros.client` protocol, `client_stream.jsonl`, HTTP endpoints, Godot/Unity stubs.
+
+Verified: stream written on run export; stubs present.
+
+Known issues: poll JSON only — not live WebSocket plugin.
+
+## Milestone 26 — Planar 3DOF orbit
+
+**Status:** complete
+
+Implemented: `integrate_orbit3dof_series` with μ/r² + thrust; `spacecraft.orbit_3dof`; config `orbit_3dof`.
+
+Verified: finite LEO radius; scenario energy-trusted.
+
+Known issues: planar 3DOF only — no attitude / 6DOF.

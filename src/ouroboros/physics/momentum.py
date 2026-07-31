@@ -627,3 +627,218 @@ def roe_energy_flux(
         for i in range(n)
     ]
     return EnergyFluxResult(du_dt=tuple(du))
+
+
+def hlld_momentum_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    magnetic_pressures_pa: list[float] | None = None,
+    enabled: bool,
+) -> MomentumFluxResult:
+    """
+    Simplified HLLD-like momentum flux with fast / Alfvén / contact waves.
+
+    Total pressure p_t = κp + p_mag. Fast speed c_f = √(c_s² + v_A²),
+    Alfvén speed v_A = √(p_mag/ρ). Star region uses contact S_M like HLLC
+    with p_t^*; Alfvén intermediate states blend momenta.
+
+    Classification: phenomenological HLLD proxy — not Miyoshi–Kusano MHD HLLD.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return MomentumFluxResult(zeros, 0.0)
+
+    kappa = pressure_scale
+    pmag = magnetic_pressures_pa or [0.0] * n
+    d_mom = [0.0] * n
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li] + max(pmag[li], 0.0)
+        p_r = kappa * pressures_pa[ri] + max(pmag[ri], 0.0)
+        va_l = (max(pmag[li], 0.0) / rho_l) ** 0.5
+        va_r = (max(pmag[ri], 0.0) / rho_r) ** 0.5
+        cs_l = (max(kappa * pressures_pa[li] / rho_l, 0.0)) ** 0.5
+        cs_r = (max(kappa * pressures_pa[ri] / rho_r, 0.0)) ** 0.5
+        cf_l = (cs_l * cs_l + va_l * va_l) ** 0.5
+        cf_r = (cs_r * cs_r + va_r * va_r) ** 0.5
+
+        s_l = min(v_l - cf_l, v_r - cf_r)
+        s_r = max(v_l + cf_l, v_r + cf_r)
+        if s_r - s_l < 1e-12:
+            s_l -= 1e-6
+            s_r += 1e-6
+
+        denom = rho_r * (s_r - v_r) - rho_l * (s_l - v_l)
+        if abs(denom) < 1e-30:
+            s_m = 0.5 * (v_l + v_r)
+        else:
+            s_m = (
+                rho_r * v_r * (s_r - v_r) - rho_l * v_l * (s_l - v_l) + p_l - p_r
+            ) / denom
+
+        # Alfvén waves in star region
+        s_al = s_m - max(0.5 * (va_l + va_r), 1e-12)
+        s_ar = s_m + max(0.5 * (va_l + va_r), 1e-12)
+
+        f_l = rho_l * v_l * v_l + p_l
+        f_r = rho_r * v_r * v_r + p_r
+        mom_l = rho_l * v_l
+        mom_r = rho_r * v_r
+
+        if abs(s_l - s_m) < 1e-30:
+            mom_star_l = mom_l
+        else:
+            rho_star_l = rho_l * (s_l - v_l) / (s_l - s_m)
+            mom_star_l = rho_star_l * s_m
+        if abs(s_r - s_m) < 1e-30:
+            mom_star_r = mom_r
+        else:
+            rho_star_r = rho_r * (s_r - v_r) / (s_r - s_m)
+            mom_star_r = rho_star_r * s_m
+
+        # Intermediate Alfvén states: blend toward contact momentum
+        mom_al = 0.5 * (mom_star_l + rho_l * s_m)
+        mom_ar = 0.5 * (mom_star_r + rho_r * s_m)
+
+        if 0.0 <= s_l:
+            phi_a = f_l
+        elif s_l <= 0.0 <= s_al:
+            phi_a = f_l + s_l * (mom_star_l - mom_l)
+        elif s_al <= 0.0 <= s_m:
+            phi_a = f_l + s_l * (mom_star_l - mom_l) + s_al * (mom_al - mom_star_l)
+        elif s_m <= 0.0 <= s_ar:
+            phi_a = f_r + s_r * (mom_star_r - mom_r) + s_ar * (mom_ar - mom_star_r)
+        elif s_ar <= 0.0 <= s_r:
+            phi_a = f_r + s_r * (mom_star_r - mom_r)
+        else:
+            phi_a = f_r
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * phi_a
+        d_mom[li] -= phi
+        d_mom[ri] += phi
+
+    dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
+    p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
+    return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)
+
+
+def hlld_energy_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    internal_energy_j: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    dv_dt: tuple[float, ...] | list[float],
+    magnetic_pressures_pa: list[float] | None = None,
+    enabled: bool,
+) -> EnergyFluxResult:
+    """
+    HLLD-like energy flux using fast/Alfvén/contact speeds from hlld_momentum_flux.
+
+    E includes magnetic: E = U/V + ½ρv² + p_mag. F_E = v(E + p_t).
+
+    Classification: phenomenological HLLD energy proxy.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return EnergyFluxResult(zeros)
+
+    kappa = pressure_scale
+    pmag = magnetic_pressures_pa or [0.0] * n
+    d_e = [0.0] * n
+    e_dens = [0.0] * n
+    for i in range(n):
+        vol = max(mesh.cells[i].volume_m3, 1e-30)
+        rho = max(masses_kg[i] / vol, 1e-30)
+        e_dens[i] = (
+            internal_energy_j[i] / vol
+            + 0.5 * rho * velocities_m_s[i] ** 2
+            + max(pmag[i], 0.0)
+        )
+
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li] + max(pmag[li], 0.0)
+        p_r = kappa * pressures_pa[ri] + max(pmag[ri], 0.0)
+        e_l = e_dens[li]
+        e_r = e_dens[ri]
+        va_l = (max(pmag[li], 0.0) / rho_l) ** 0.5
+        va_r = (max(pmag[ri], 0.0) / rho_r) ** 0.5
+        cs_l = (max(kappa * pressures_pa[li] / rho_l, 0.0)) ** 0.5
+        cs_r = (max(kappa * pressures_pa[ri] / rho_r, 0.0)) ** 0.5
+        cf_l = (cs_l * cs_l + va_l * va_l) ** 0.5
+        cf_r = (cs_r * cs_r + va_r * va_r) ** 0.5
+        s_l = min(v_l - cf_l, v_r - cf_r)
+        s_r = max(v_l + cf_l, v_r + cf_r)
+        if s_r - s_l < 1e-12:
+            s_l -= 1e-6
+            s_r += 1e-6
+        denom = rho_r * (s_r - v_r) - rho_l * (s_l - v_l)
+        if abs(denom) < 1e-30:
+            s_m = 0.5 * (v_l + v_r)
+        else:
+            s_m = (
+                rho_r * v_r * (s_r - v_r) - rho_l * v_l * (s_l - v_l) + p_l - p_r
+            ) / denom
+        s_al = s_m - max(0.5 * (va_l + va_r), 1e-12)
+        s_ar = s_m + max(0.5 * (va_l + va_r), 1e-12)
+        p_star = p_l + rho_l * (s_l - v_l) * (s_m - v_l)
+        f_l = v_l * (e_l + p_l)
+        f_r = v_r * (e_r + p_r)
+        if abs(s_l - s_m) < 1e-30:
+            e_star_l = e_l
+        else:
+            e_star_l = ((s_l - v_l) * e_l - p_l * v_l + p_star * s_m) / (s_l - s_m)
+        if abs(s_r - s_m) < 1e-30:
+            e_star_r = e_r
+        else:
+            e_star_r = ((s_r - v_r) * e_r - p_r * v_r + p_star * s_m) / (s_r - s_m)
+        e_al = 0.5 * (e_star_l + e_l)
+        e_ar = 0.5 * (e_star_r + e_r)
+
+        if 0.0 <= s_l:
+            phi_a = f_l
+        elif s_l <= 0.0 <= s_al:
+            phi_a = f_l + s_l * (e_star_l - e_l)
+        elif s_al <= 0.0 <= s_m:
+            phi_a = f_l + s_l * (e_star_l - e_l) + s_al * (e_al - e_star_l)
+        elif s_m <= 0.0 <= s_ar:
+            phi_a = f_r + s_r * (e_star_r - e_r) + s_ar * (e_ar - e_star_r)
+        elif s_ar <= 0.0 <= s_r:
+            phi_a = f_r + s_r * (e_star_r - e_r)
+        else:
+            phi_a = f_r
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * phi_a
+        d_e[li] -= phi
+        d_e[ri] += phi
+
+    du = [
+        d_e[i] - masses_kg[i] * velocities_m_s[i] * float(dv_dt[i])
+        for i in range(n)
+    ]
+    return EnergyFluxResult(du_dt=tuple(du))
