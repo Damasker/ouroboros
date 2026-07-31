@@ -498,6 +498,7 @@ class OneDSystem:
             from ouroboros.physics.momentum import (
                 CellPressureForces,
                 cell_grad_p_forces,
+                hllc_energy_flux,
                 hllc_momentum_flux,
                 rusanov_energy_flux,
                 rusanov_momentum_flux,
@@ -569,8 +570,8 @@ class OneDSystem:
                 )
 
             if use_riemann and cfg.oned.riemann_energy:
-                eflux = rusanov_energy_flux(
-                    mesh,
+                e_kwargs = dict(
+                    mesh=mesh,
                     masses_kg=masses,
                     velocities_m_s=vs,
                     pressures_pa=cell_pressures,
@@ -580,6 +581,10 @@ class OneDSystem:
                     dv_dt=mflux.dv_dt,
                     enabled=True,
                 )
+                if cfg.oned.riemann == "hllc":
+                    eflux = hllc_energy_flux(**e_kwargs)
+                else:
+                    eflux = rusanov_energy_flux(**e_kwargs)
                 for i in range(L.n_cells):
                     dydt[L.idx_u(i)] += eflux.du_dt[i]
             elif use_riemann:

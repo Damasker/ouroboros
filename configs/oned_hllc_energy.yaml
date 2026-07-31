@@ -1,8 +1,8 @@
-# 1D HLLC momentum + energy flux (Milestone 17; energy solver follows riemann=hllc → M18 HLLC)
+# 1D HLLC momentum + HLLC star energy fluxes (Milestone 18)
 simulation:
   duration_s: 0.2
   output_interval_s: 0.01
-  scenario: oned-energy-flux
+  scenario: oned-hllc-energy
   model: oned
   integrator:
     method: LSODA

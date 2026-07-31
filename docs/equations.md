@@ -209,6 +209,17 @@ F=v(E+\kappa p).
 
 Cell update: \(\dot U_i=\dot E_i^{\mathrm{flux}}-m_i v_i\dot v_i^{\mathrm{mom}}\). Volume-weighted momentum thermalize is skipped. Classification: simplified Euler LLF energy — not HLLC/Roe star energy.
 
+## 4k. HLLC star energy (Milestone 18)
+
+With `oned.riemann: hllc` and `riemann_energy: true`:
+
+\[
+p^*=p_L+\rho_L(S_L-v_L)(S_M-v_L),\qquad
+E^*_K=\frac{(S_K-v_K)E_K-p_K v_K+p^* S_M}{S_K-S_M}.
+\]
+
+Piecewise HLLC flux on \(F_E=v(E+\kappa p)\) as for momentum; \(\dot U\) closure unchanged. Classification: simplified HLLC energy — not Roe/HLLD/MHD.
+
 ## 5. D–T fusion
 
 \[

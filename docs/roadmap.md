@@ -115,9 +115,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - \(\dot U_i=\dot E_i^{\mathrm{flux}}-m_i v_i\dot v_i\) replaces volume-weighted thermalize
 - Config `oned_energy_flux` (HLLC momentum + energy flux)
 
+## Milestone 18 — HLLC star energy
+
+- `hllc_energy_flux` with \(E^*_K\), \(p^*\) (Toro); selected when `riemann: hllc` + `riemann_energy`
+- Rusanov energy retained for `riemann: rusanov`
+- Config `oned_hllc_energy`
+
 ## Beyond
 
-- HLLC star energy / Roe / wave MHD
+- Roe / wave MHD / HLLD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
 - Higher-fidelity nozzle / spacecraft trajectory coupling

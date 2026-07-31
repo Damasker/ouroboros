@@ -59,6 +59,7 @@ make run-scenario SCENARIO=oned-momentum-flux
 make run-scenario SCENARIO=oned-rusanov
 make run-scenario SCENARIO=oned-hllc
 make run-scenario SCENARIO=oned-energy-flux
+make run-scenario SCENARIO=oned-hllc-energy
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.

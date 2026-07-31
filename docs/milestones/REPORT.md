@@ -156,8 +156,18 @@ Known issues: momentum-only HLLC (no total-energy Riemann); sound speed \(\sqrt{
 
 **Status:** complete
 
-Implemented: `rusanov_energy_flux` for \(E=U/V+\tfrac12\rho v^2\); `oned.riemann_energy` applies \(\dot U=\dot E_{\mathrm{flux}}-m v\dot v\) and skips volume-weighted momentum thermalize; demo `oned_energy_flux` (HLLC + energy).
+Implemented: `rusanov_energy_flux` for \(E=U/V+\tfrac12\rho v^2\); `oned.riemann_energy` applies \(\dot U=\dot E_{\mathrm{flux}}-m v\dot v\) and skips volume-weighted momentum thermalize; demo `oned_energy_flux`.
 
 Verified: closed-mesh identity \(\sum\dot U+\sum m v\dot v=0\); short 1D run energy-trusted.
 
-Known issues: energy flux is Rusanov only (not HLLC star energy); mass \(N\) still uses legacy face transport; not Roe/MHD.
+Known issues (superseded by M18 for HLLC path): originally Rusanov energy only; mass \(N\) still legacy face transport; not Roe/MHD.
+
+## Milestone 18 — HLLC star energy
+
+**Status:** complete
+
+Implemented: `hllc_energy_flux` with Toro \(S_L,S_R,S_M\), \(p^*\), \(E^*_K\); auto-selected when `riemann: hllc` and `riemann_energy`; config `oned_hllc_energy`.
+
+Verified: closed-mesh identity \(\sum\dot U+\sum m v\dot v=0\); short 1D run energy-trusted.
+
+Known issues: phenomenological masses; sound speed without \(\gamma\); mass \(N\) still legacy face transport; not Roe/HLLD/MHD.

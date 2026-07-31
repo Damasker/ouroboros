@@ -378,3 +378,102 @@ def rusanov_energy_flux(
         for i in range(n)
     ]
     return EnergyFluxResult(du_dt=tuple(du))
+
+
+def hllc_energy_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    internal_energy_j: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    dv_dt: tuple[float, ...] | list[float],
+    enabled: bool,
+) -> EnergyFluxResult:
+    """
+    HLLC flux for total energy density E = U/V + ½ρv² (Toro star region).
+
+    Wave speeds match hllc_momentum_flux. Star pressure
+    p* = p_L + ρ_L (S_L−v_L)(S_M−v_L); star energy
+    E*_K = [(S_K−v_K)E_K − p_K v_K + p* S_M] / (S_K−S_M).
+
+    Cell internal update: ẊU_i = −div Φ_E − m_i v_i ẋv_i.
+
+    Classification: simplified HLLC energy / phenomenological — not full Euler/MHD.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return EnergyFluxResult(zeros)
+
+    kappa = pressure_scale
+    d_e = [0.0] * n
+    e_dens = [0.0] * n
+    for i in range(n):
+        vol = max(mesh.cells[i].volume_m3, 1e-30)
+        rho = max(masses_kg[i] / vol, 1e-30)
+        e_dens[i] = internal_energy_j[i] / vol + 0.5 * rho * velocities_m_s[i] ** 2
+
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        e_l = e_dens[li]
+        e_r = e_dens[ri]
+        c_l = (max(p_l / rho_l, 0.0)) ** 0.5
+        c_r = (max(p_r / rho_r, 0.0)) ** 0.5
+        s_l = min(v_l - c_l, v_r - c_r)
+        s_r = max(v_l + c_l, v_r + c_r)
+        if s_r - s_l < 1e-12:
+            s_l -= 1e-6
+            s_r += 1e-6
+
+        denom = rho_r * (s_r - v_r) - rho_l * (s_l - v_l)
+        if abs(denom) < 1e-30:
+            s_m = 0.5 * (v_l + v_r)
+        else:
+            s_m = (
+                rho_r * v_r * (s_r - v_r) - rho_l * v_l * (s_l - v_l) + p_l - p_r
+            ) / denom
+
+        p_star = p_l + rho_l * (s_l - v_l) * (s_m - v_l)
+
+        f_l = v_l * (e_l + p_l)
+        f_r = v_r * (e_r + p_r)
+
+        if abs(s_l - s_m) < 1e-30:
+            e_star_l = e_l
+        else:
+            e_star_l = ((s_l - v_l) * e_l - p_l * v_l + p_star * s_m) / (s_l - s_m)
+        if abs(s_r - s_m) < 1e-30:
+            e_star_r = e_r
+        else:
+            e_star_r = ((s_r - v_r) * e_r - p_r * v_r + p_star * s_m) / (s_r - s_m)
+
+        if 0.0 <= s_l:
+            phi_a = f_l
+        elif s_l <= 0.0 <= s_m:
+            phi_a = f_l + s_l * (e_star_l - e_l)
+        elif s_m <= 0.0 <= s_r:
+            phi_a = f_r + s_r * (e_star_r - e_r)
+        else:
+            phi_a = f_r
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * phi_a
+        d_e[li] -= phi
+        d_e[ri] += phi
+
+    du = [
+        d_e[i] - masses_kg[i] * velocities_m_s[i] * float(dv_dt[i])
+        for i in range(n)
+    ]
+    return EnergyFluxResult(du_dt=tuple(du))
