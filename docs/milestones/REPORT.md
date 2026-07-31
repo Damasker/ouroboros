@@ -121,3 +121,13 @@ Implemented: `physics/nozzle.py` extract→jet/waste split; `EnergyLedger.e_thru
 Verified: jet+waste = extracted enthalpy; multizone demo energy-trusted with nonzero thrust.
 
 Known issues: coefficients are speculative; not a de Laval / MHD nozzle design tool; no vehicle trajectory.
+
+## Milestone 14 — Upwind momentum flux
+
+**Status:** complete
+
+Implemented: `upwind_momentum_flux` in `physics/momentum.py`; optional on `cell_velocity` via `oned.momentum_flux`; numerical-viscosity heating into cell \(U\); config `oned_momentum_flux`.
+
+Verified: flux KE power ≤0 with heating identity; short 1D run energy-trusted.
+
+Known issues: not HLLC/Roe; uses phenomenological cell masses \(m_i\propto V_i\), not \(\rho\) from particle number.

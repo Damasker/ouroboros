@@ -112,3 +112,51 @@ def cell_inertias_kg(mesh: OneDMesh, effective_inertia_kg: float) -> list[float]
     vtot = max(sum(vols), 1e-30)
     m = max(effective_inertia_kg, 1e-30)
     return [m * (v / vtot) for v in vols]
+
+
+@dataclass(frozen=True)
+class MomentumFluxResult:
+    """Per-cell dv/dt from upwind momentum flux + optional numerical heating."""
+
+    dv_dt: tuple[float, ...]
+    numerical_heating_w: float  # total power to dump into internal energy (≥0)
+
+
+def upwind_momentum_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    face_speeds_m_s: list[float],
+    enabled: bool,
+) -> MomentumFluxResult:
+    """
+    Upwind momentum flux Φ = u_eff * A * (m/V)_up * v_up [kg m/s² = N].
+
+    Updates d(mv)/dt = −∇·(ρ v v); returns dv/dt = (1/m) d(mv)/dt.
+    Kinetic power sum m v dv/dt is typically ≤0 (upwind dissipation).
+
+    Classification: simplified FV / phenomenological numerical viscosity.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_speeds_m_s) != len(mesh.faces):
+        return MomentumFluxResult(zeros, 0.0)
+
+    d_mom = [0.0] * n
+    for face, u_eff in zip(mesh.faces, face_speeds_m_s, strict=True):
+        li, ri = face.left, face.right
+        if u_eff >= 0.0:
+            up = li
+        else:
+            up = ri
+        vol = max(mesh.cells[up].volume_m3, 1e-30)
+        rho = masses_kg[up] / vol
+        phi = u_eff * face.area_m2 * rho * velocities_m_s[up]
+        d_mom[li] -= phi
+        d_mom[ri] += phi
+
+    dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
+    p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
+    heating = max(-p_ke, 0.0)
+    return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=heating)

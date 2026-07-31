@@ -495,7 +495,7 @@ class OneDSystem:
 
         if L.cell_velocity:
             from ouroboros.physics.coupling import path_throttle_rhs
-            from ouroboros.physics.momentum import cell_grad_p_forces
+            from ouroboros.physics.momentum import cell_grad_p_forces, upwind_momentum_flux
 
             masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
             vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
@@ -509,6 +509,31 @@ class OneDSystem:
             for i, hw in enumerate(gpf.cell_heating_w):
                 if hw != 0.0:
                     dydt[L.idx_u(i)] += hw
+
+            # Face advection speeds (same valve/split as mass flux)
+            face_speeds: list[float] = []
+            for face in mesh.faces:
+                u = self._face_velocity(face.path, y, face.left, face.right, v_a, v_b)
+                valve = 1.0
+                if face.valve_key == "a":
+                    valve = valve_a
+                elif face.valve_key == "b":
+                    valve = valve_b
+                face_speeds.append(u * valve * face.split_fraction)
+
+            mflux = upwind_momentum_flux(
+                mesh,
+                masses_kg=masses,
+                velocities_m_s=vs,
+                face_speeds_m_s=face_speeds,
+                enabled=cfg.oned.momentum_flux,
+            )
+            if cfg.oned.momentum_flux and cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w > 0.0:
+                # Deposit upwind KE sink into cells proportional to volume
+                vols = [c.volume_m3 for c in mesh.cells]
+                vtot = max(sum(vols), 1e-30)
+                for i in range(L.n_cells):
+                    dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
 
             # Path-a / path-b cell index lists
             idx_a = [c.global_index for c in mesh.cells if c.path == "a"]
@@ -561,12 +586,13 @@ class OneDSystem:
                     f += db.f_magnetic_n * (masses[i] / m_b)
                 p_drive_work += f_drive * vs[i]
                 f += f_fric + f_drive
-                dydt[L.idx_v(i)] = f / max(masses[i], 1e-30)
+                dydt[L.idx_v(i)] = f / max(masses[i], 1e-30) + mflux.dv_dt[i]
 
             extra_a = float(sum(gpf.force_n[i] for i in idx_a))
             extra_b = float(sum(gpf.force_n[i] for i in idx_b))
             step_heat = 0.0
             step_diss = 0.0
+            momentum_flux_heating = mflux.numerical_heating_w if cfg.oned.momentum_flux else 0.0
         else:
             from ouroboros.core.dynamics import dual_path_throttle_step
             from ouroboros.physics.momentum import path_pressure_forces_from_cells
@@ -632,6 +658,7 @@ class OneDSystem:
             p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
             step_heat = step.plasma_heating_w
             step_diss = step.dissipative_power_w
+            momentum_flux_heating = 0.0
 
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
@@ -676,6 +703,7 @@ class OneDSystem:
                 "cell_pressure_force_a_n": extra_a,
                 "cell_pressure_force_b_n": extra_b,
                 "momentum_mode": cfg.oned.momentum_mode,
+                "momentum_flux_heating_w": momentum_flux_heating,
                 "thrust_n": nz.thrust_n,
                 "isp_s": nz.isp_s,
                 "jet_power_w": nz.jet_power_w,

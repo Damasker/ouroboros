@@ -161,6 +161,18 @@ P_{\mathrm{waste}}=(1-\eta)P_{\mathrm{th}}.
 Then \(\dot m=m_p\dot N_{\mathrm{ex}}\), \(v_{\mathrm{ex}}=\sqrt{2P_{\mathrm{jet}}/\dot m}\), \(T=\dot m\,v_{\mathrm{ex}}\), \(I_{\mathrm{sp}}=v_{\mathrm{ex}}/g_0\).
 Ledger: \(E_{\mathrm{thrust}}=\int P_{\mathrm{jet}}\) (output), waste adds to exhaust. Classification: **phenomenological / speculative**.
 
+## 4g. Upwind momentum flux (Milestone 14)
+
+For `cell_velocity` with `oned.momentum_flux: true`:
+
+\[
+\Phi = u_{\mathrm{eff}} A \rho_{\mathrm{up}} v_{\mathrm{up}},\qquad
+\rho_{\mathrm{up}}=m_{\mathrm{up}}/V_{\mathrm{up}},\qquad
+m_i\dot v_i += -(\Phi_{\mathrm{out}}-\Phi_{\mathrm{in}}).
+\]
+
+Upwinding typically yields \(\sum m_i v_i\dot v_i^{\mathrm{flux}}\le 0\); with `thermalize_momentum_flux` that sink is deposited into cell internal energy (numerical viscosity). Classification: simplified FV — not a Riemann MHD solver.
+
 ## 5. D–T fusion
 
 \[

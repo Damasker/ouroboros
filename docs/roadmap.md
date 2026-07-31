@@ -91,9 +91,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Ledger `e_thrust_j` + waste→exhaust; series thrust / I_sp / jet power
 - Config `magnetic_nozzle`
 
+## Milestone 14 — Upwind momentum flux (1D)
+
+- `oned.momentum_flux` on `cell_velocity`: \(\Phi=u A\rho_{\mathrm{up}}v_{\mathrm{up}}\)
+- Thermalize upwind KE sink into cell \(U\) (`thermalize_momentum_flux`)
+- Config `oned_momentum_flux`
+
 ## Beyond
 
-- Momentum-flux Riemann / wave MHD
+- HLLC / Roe Riemann / wave MHD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
 - Higher-fidelity nozzle / spacecraft trajectory coupling

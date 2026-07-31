@@ -161,6 +161,9 @@ class OneDSection(BaseModel):
     pressure_force_scale: float = 1.0e-6
     # When cell_pressure / cell_velocity: exchange pressure work with cell U
     compressional_exchange: bool = True
+    # Milestone 14: upwind momentum flux (cell_velocity only)
+    momentum_flux: bool = False
+    thermalize_momentum_flux: bool = True
 
 
 class BlanketSection(BaseModel):
