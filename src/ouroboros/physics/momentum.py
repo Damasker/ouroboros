@@ -215,3 +215,93 @@ def rusanov_momentum_flux(
     p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
     # Full kin↔int exchange for this flux channel
     return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)
+
+
+def hllc_momentum_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    enabled: bool,
+) -> MomentumFluxResult:
+    """
+    HLLC flux for momentum: F = ρv² + κp (Toro-style star region).
+
+    Wave speeds: S_L = min(v_L−c_L, v_R−c_R), S_R = max(v_L+c_L, v_R+c_R),
+    contact S_M from pressure–momentum jump. Sound speed c ≈ √(κp/ρ).
+
+    Energy exchange: numerical_heating_w = −∑ m v dv (signed).
+
+    Classification: simplified HLLC / phenomenological — not full Euler HLLC.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return MomentumFluxResult(zeros, 0.0)
+
+    kappa = pressure_scale
+    d_mom = [0.0] * n
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        c_l = (max(p_l / rho_l, 0.0)) ** 0.5
+        c_r = (max(p_r / rho_r, 0.0)) ** 0.5
+        s_l = min(v_l - c_l, v_r - c_r)
+        s_r = max(v_l + c_l, v_r + c_r)
+        # Widen slightly if waves collapse
+        if s_r - s_l < 1e-12:
+            s_l -= 1e-6
+            s_r += 1e-6
+
+        denom = rho_r * (s_r - v_r) - rho_l * (s_l - v_l)
+        if abs(denom) < 1e-30:
+            s_m = 0.5 * (v_l + v_r)
+        else:
+            s_m = (
+                rho_r * v_r * (s_r - v_r) - rho_l * v_l * (s_l - v_l) + p_l - p_r
+            ) / denom
+
+        f_l = rho_l * v_l * v_l + p_l
+        f_r = rho_r * v_r * v_r + p_r
+        mom_l = rho_l * v_l
+        mom_r = rho_r * v_r
+
+        # Star states (density × contact speed)
+        if abs(s_l - s_m) < 1e-30:
+            mom_star_l = mom_l
+        else:
+            rho_star_l = rho_l * (s_l - v_l) / (s_l - s_m)
+            mom_star_l = rho_star_l * s_m
+        if abs(s_r - s_m) < 1e-30:
+            mom_star_r = mom_r
+        else:
+            rho_star_r = rho_r * (s_r - v_r) / (s_r - s_m)
+            mom_star_r = rho_star_r * s_m
+
+        if 0.0 <= s_l:
+            phi_a = f_l
+        elif s_l <= 0.0 <= s_m:
+            phi_a = f_l + s_l * (mom_star_l - mom_l)
+        elif s_m <= 0.0 <= s_r:
+            phi_a = f_r + s_r * (mom_star_r - mom_r)
+        else:
+            phi_a = f_r
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * phi_a
+        d_mom[li] -= phi
+        d_mom[ri] += phi
+
+    dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
+    p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
+    return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)

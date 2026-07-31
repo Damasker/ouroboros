@@ -62,6 +62,7 @@ demo: setup
 	$(MAKE) run-scenario SCENARIO=magnetic-nozzle
 	$(MAKE) run-scenario SCENARIO=oned-momentum-flux
 	$(MAKE) run-scenario SCENARIO=oned-rusanov
+	$(MAKE) run-scenario SCENARIO=oned-hllc
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

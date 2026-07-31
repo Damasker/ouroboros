@@ -184,6 +184,19 @@ S=\max(|v_L|+c_L,|v_R|+c_R),\quad c\sim\sqrt{\kappa p/\rho}.
 
 Separate \(\nabla p\) / upwind momentum flux are disabled. Energy: \(\dot U_{\mathrm{tot}}=-\sum m_i v_i\dot v_i^{\mathrm{Rusanov}}\). Classification: simplified Local Lax–Friedrichs — not HLLC/Roe/MHD.
 
+## 4i. HLLC flux (Milestone 16)
+
+With `oned.riemann: hllc` (same \(F=\rho v^2+\kappa p\), \(c\sim\sqrt{\kappa p/\rho}\)):
+
+\[
+S_L=\min(v_L-c_L,v_R-c_R),\quad
+S_R=\max(v_L+c_L,v_R+c_R),\quad
+S_M=\frac{\rho_R v_R(S_R-v_R)-\rho_L v_L(S_L-v_L)+p_L-p_R}
+{\rho_R(S_R-v_R)-\rho_L(S_L-v_L)}.
+\]
+
+Star momenta \(\rho^* S_M\) feed the usual HLLC piecewise flux; \(\nabla p\) / upwind are disabled. Energy: \(\dot U_{\mathrm{tot}}=-\sum m_i v_i\dot v_i^{\mathrm{HLLC}}\). Classification: simplified HLLC on phenomenological masses — not full Euler/MHD HLLC.
+
 ## 5. D–T fusion
 
 \[

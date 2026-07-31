@@ -141,3 +141,13 @@ Implemented: `rusanov_momentum_flux` with \(F=\rho v^2+\kappa p\); `oned.riemann
 Verified: heating identity \(P_U=-\sum m v\dot v\); short 1D run energy-trusted.
 
 Known issues: still Local Lax–Friedrichs only; sound speed uses \(\sqrt{\kappa p/\rho}\) without \(\gamma\); not MHD.
+
+## Milestone 16 — HLLC Riemann fluxes
+
+**Status:** complete
+
+Implemented: `hllc_momentum_flux` with Toro-style \(S_L,S_R,S_M\) on \(F=\rho v^2+\kappa p\); `oned.riemann: hllc` path sharing Rusanov’s skip of `cell_grad_p` / upwind; signed kin↔int exchange; config `oned_hllc`.
+
+Verified: heating identity \(P_U=-\sum m v\dot v\); short 1D run energy-trusted.
+
+Known issues: momentum-only HLLC (no total-energy Riemann); sound speed \(\sqrt{\kappa p/\rho}\) without \(\gamma\); phenomenological cell masses; not MHD HLLD.

@@ -103,9 +103,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Replaces separate \(\nabla p\) + upwind momentum flux when enabled
 - Config `oned_rusanov`
 
+## Milestone 16 — HLLC Riemann fluxes
+
+- `oned.riemann: hllc` — Toro-style HLLC on \(F=\rho v^2+\kappa p\) with contact \(S_M\)
+- Same kin↔int exchange / double-count avoidance as Rusanov
+- Config `oned_hllc`
+
 ## Beyond
 
-- HLLC / Roe / wave MHD
+- Full Euler energy equation / Roe / wave MHD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
 - Higher-fidelity nozzle / spacecraft trajectory coupling

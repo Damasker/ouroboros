@@ -498,15 +498,16 @@ class OneDSystem:
             from ouroboros.physics.momentum import (
                 CellPressureForces,
                 cell_grad_p_forces,
+                hllc_momentum_flux,
                 rusanov_momentum_flux,
                 upwind_momentum_flux,
             )
 
             masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
             vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
-            use_rusanov = cfg.oned.riemann == "rusanov"
+            use_riemann = cfg.oned.riemann in ("rusanov", "hllc")
 
-            if use_rusanov:
+            if use_riemann:
                 gpf = CellPressureForces(
                     force_n=tuple(0.0 for _ in range(L.n_cells)),
                     cell_heating_w=tuple(0.0 for _ in range(L.n_cells)),
@@ -537,7 +538,17 @@ class OneDSystem:
                 face_factors.append(fac)
                 face_speeds.append(u * fac)
 
-            if use_rusanov:
+            if cfg.oned.riemann == "hllc":
+                mflux = hllc_momentum_flux(
+                    mesh,
+                    masses_kg=masses,
+                    velocities_m_s=vs,
+                    pressures_pa=cell_pressures,
+                    face_area_factors=face_factors,
+                    pressure_scale=cfg.oned.pressure_force_scale,
+                    enabled=True,
+                )
+            elif cfg.oned.riemann == "rusanov":
                 mflux = rusanov_momentum_flux(
                     mesh,
                     masses_kg=masses,
@@ -547,11 +558,6 @@ class OneDSystem:
                     pressure_scale=cfg.oned.pressure_force_scale,
                     enabled=True,
                 )
-                if cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w != 0.0:
-                    vols = [c.volume_m3 for c in mesh.cells]
-                    vtot = max(sum(vols), 1e-30)
-                    for i in range(L.n_cells):
-                        dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
             else:
                 mflux = upwind_momentum_flux(
                     mesh,
@@ -560,15 +566,22 @@ class OneDSystem:
                     face_speeds_m_s=face_speeds,
                     enabled=cfg.oned.momentum_flux,
                 )
-                if (
-                    cfg.oned.momentum_flux
-                    and cfg.oned.thermalize_momentum_flux
-                    and mflux.numerical_heating_w > 0.0
-                ):
+
+            if use_riemann:
+                if cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w != 0.0:
                     vols = [c.volume_m3 for c in mesh.cells]
                     vtot = max(sum(vols), 1e-30)
                     for i in range(L.n_cells):
                         dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
+            elif (
+                cfg.oned.momentum_flux
+                and cfg.oned.thermalize_momentum_flux
+                and mflux.numerical_heating_w > 0.0
+            ):
+                vols = [c.volume_m3 for c in mesh.cells]
+                vtot = max(sum(vols), 1e-30)
+                for i in range(L.n_cells):
+                    dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
 
             # Path-a / path-b cell index lists
             idx_a = [c.global_index for c in mesh.cells if c.path == "a"]
@@ -628,7 +641,7 @@ class OneDSystem:
             step_diss = 0.0
             momentum_flux_heating = (
                 mflux.numerical_heating_w
-                if (use_rusanov or cfg.oned.momentum_flux)
+                if (use_riemann or cfg.oned.momentum_flux)
                 else 0.0
             )
         else:
