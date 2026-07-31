@@ -495,23 +495,37 @@ class OneDSystem:
 
         if L.cell_velocity:
             from ouroboros.physics.coupling import path_throttle_rhs
-            from ouroboros.physics.momentum import cell_grad_p_forces, upwind_momentum_flux
+            from ouroboros.physics.momentum import (
+                CellPressureForces,
+                cell_grad_p_forces,
+                rusanov_momentum_flux,
+                upwind_momentum_flux,
+            )
 
             masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
             vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
-            gpf = cell_grad_p_forces(
-                mesh,
-                pressures_pa=cell_pressures,
-                velocities_m_s=vs,
-                scale=cfg.oned.pressure_force_scale,
-                compressional_exchange=cfg.oned.compressional_exchange,
-            )
-            for i, hw in enumerate(gpf.cell_heating_w):
-                if hw != 0.0:
-                    dydt[L.idx_u(i)] += hw
+            use_rusanov = cfg.oned.riemann == "rusanov"
 
-            # Face advection speeds (same valve/split as mass flux)
+            if use_rusanov:
+                gpf = CellPressureForces(
+                    force_n=tuple(0.0 for _ in range(L.n_cells)),
+                    cell_heating_w=tuple(0.0 for _ in range(L.n_cells)),
+                )
+            else:
+                gpf = cell_grad_p_forces(
+                    mesh,
+                    pressures_pa=cell_pressures,
+                    velocities_m_s=vs,
+                    scale=cfg.oned.pressure_force_scale,
+                    compressional_exchange=cfg.oned.compressional_exchange,
+                )
+                for i, hw in enumerate(gpf.cell_heating_w):
+                    if hw != 0.0:
+                        dydt[L.idx_u(i)] += hw
+
+            # Face area factors (valve×split); speeds for upwind-only path
             face_speeds: list[float] = []
+            face_factors: list[float] = []
             for face in mesh.faces:
                 u = self._face_velocity(face.path, y, face.left, face.right, v_a, v_b)
                 valve = 1.0
@@ -519,21 +533,42 @@ class OneDSystem:
                     valve = valve_a
                 elif face.valve_key == "b":
                     valve = valve_b
-                face_speeds.append(u * valve * face.split_fraction)
+                fac = valve * face.split_fraction
+                face_factors.append(fac)
+                face_speeds.append(u * fac)
 
-            mflux = upwind_momentum_flux(
-                mesh,
-                masses_kg=masses,
-                velocities_m_s=vs,
-                face_speeds_m_s=face_speeds,
-                enabled=cfg.oned.momentum_flux,
-            )
-            if cfg.oned.momentum_flux and cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w > 0.0:
-                # Deposit upwind KE sink into cells proportional to volume
-                vols = [c.volume_m3 for c in mesh.cells]
-                vtot = max(sum(vols), 1e-30)
-                for i in range(L.n_cells):
-                    dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
+            if use_rusanov:
+                mflux = rusanov_momentum_flux(
+                    mesh,
+                    masses_kg=masses,
+                    velocities_m_s=vs,
+                    pressures_pa=cell_pressures,
+                    face_area_factors=face_factors,
+                    pressure_scale=cfg.oned.pressure_force_scale,
+                    enabled=True,
+                )
+                if cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w != 0.0:
+                    vols = [c.volume_m3 for c in mesh.cells]
+                    vtot = max(sum(vols), 1e-30)
+                    for i in range(L.n_cells):
+                        dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
+            else:
+                mflux = upwind_momentum_flux(
+                    mesh,
+                    masses_kg=masses,
+                    velocities_m_s=vs,
+                    face_speeds_m_s=face_speeds,
+                    enabled=cfg.oned.momentum_flux,
+                )
+                if (
+                    cfg.oned.momentum_flux
+                    and cfg.oned.thermalize_momentum_flux
+                    and mflux.numerical_heating_w > 0.0
+                ):
+                    vols = [c.volume_m3 for c in mesh.cells]
+                    vtot = max(sum(vols), 1e-30)
+                    for i in range(L.n_cells):
+                        dydt[L.idx_u(i)] += mflux.numerical_heating_w * (vols[i] / vtot)
 
             # Path-a / path-b cell index lists
             idx_a = [c.global_index for c in mesh.cells if c.path == "a"]
@@ -573,7 +608,6 @@ class OneDSystem:
             for i in range(L.n_cells):
                 cell = mesh.cells[i]
                 f = gpf.force_n[i]
-                # Friction share ~ mass fraction
                 b_i = b_tot * (masses[i] / max(cfg.plasma.effective_inertia_kg, 1e-30))
                 f_fric = -b_i * vs[i]
                 p_friction += -f_fric * vs[i]
@@ -592,7 +626,11 @@ class OneDSystem:
             extra_b = float(sum(gpf.force_n[i] for i in idx_b))
             step_heat = 0.0
             step_diss = 0.0
-            momentum_flux_heating = mflux.numerical_heating_w if cfg.oned.momentum_flux else 0.0
+            momentum_flux_heating = (
+                mflux.numerical_heating_w
+                if (use_rusanov or cfg.oned.momentum_flux)
+                else 0.0
+            )
         else:
             from ouroboros.core.dynamics import dual_path_throttle_step
             from ouroboros.physics.momentum import path_pressure_forces_from_cells
@@ -704,6 +742,7 @@ class OneDSystem:
                 "cell_pressure_force_b_n": extra_b,
                 "momentum_mode": cfg.oned.momentum_mode,
                 "momentum_flux_heating_w": momentum_flux_heating,
+                "riemann": cfg.oned.riemann,
                 "thrust_n": nz.thrust_n,
                 "isp_s": nz.isp_s,
                 "jet_power_w": nz.jet_power_w,

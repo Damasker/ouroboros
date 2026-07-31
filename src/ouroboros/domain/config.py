@@ -164,6 +164,8 @@ class OneDSection(BaseModel):
     # Milestone 14: upwind momentum flux (cell_velocity only)
     momentum_flux: bool = False
     thermalize_momentum_flux: bool = True
+    # Milestone 15: none | rusanov (replaces cell_grad_p + upwind when set)
+    riemann: Literal["none", "rusanov"] = "none"
 
 
 class BlanketSection(BaseModel):

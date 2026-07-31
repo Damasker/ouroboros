@@ -97,9 +97,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Thermalize upwind KE sink into cell \(U\) (`thermalize_momentum_flux`)
 - Config `oned_momentum_flux`
 
+## Milestone 15 — Rusanov Riemann fluxes
+
+- `oned.riemann: rusanov` — Local Lax–Friedrichs flux with \(\rho v^2+\kappa p\)
+- Replaces separate \(\nabla p\) + upwind momentum flux when enabled
+- Config `oned_rusanov`
+
 ## Beyond
 
-- HLLC / Roe Riemann / wave MHD
+- HLLC / Roe / wave MHD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
 - Higher-fidelity nozzle / spacecraft trajectory coupling

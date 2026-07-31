@@ -160,3 +160,58 @@ def upwind_momentum_flux(
     p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
     heating = max(-p_ke, 0.0)
     return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=heating)
+
+
+def rusanov_momentum_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    enabled: bool,
+) -> MomentumFluxResult:
+    """
+    Rusanov flux for momentum density: F = ρv² + κp.
+
+    Φ/A = ½(F_L+F_R) − ½ S (ρv_R − ρv_L),  S = max(|v|+c),
+    c ≈ √(max(κp/ρ, 0)). face_area_factors multiply A (valve×split).
+
+    Energy exchange: numerical_heating_w = −∑ m v dv (signed; add to ΣU).
+
+    Classification: simplified FV Rusanov / phenomenological.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return MomentumFluxResult(zeros, 0.0)
+
+    kappa = pressure_scale
+    d_mom = [0.0] * n
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = masses_kg[li] / vol_l
+        rho_r = masses_kg[ri] / vol_r
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        f_l = rho_l * v_l * v_l + p_l
+        f_r = rho_r * v_r * v_r + p_r
+        c_l = (max(p_l / max(rho_l, 1e-30), 0.0)) ** 0.5
+        c_r = (max(p_r / max(rho_r, 1e-30), 0.0)) ** 0.5
+        s_max = max(abs(v_l) + c_l, abs(v_r) + c_r, 1e-12)
+        a_eff = face.area_m2 * max(af, 0.0)
+        mom_l = rho_l * v_l
+        mom_r = rho_r * v_r
+        phi = a_eff * (0.5 * (f_l + f_r) - 0.5 * s_max * (mom_r - mom_l))
+        d_mom[li] -= phi
+        d_mom[ri] += phi
+
+    dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
+    p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
+    # Full kin↔int exchange for this flux channel
+    return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)

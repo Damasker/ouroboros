@@ -131,3 +131,13 @@ Implemented: `upwind_momentum_flux` in `physics/momentum.py`; optional on `cell_
 Verified: flux KE power ≤0 with heating identity; short 1D run energy-trusted.
 
 Known issues: not HLLC/Roe; uses phenomenological cell masses \(m_i\propto V_i\), not \(\rho\) from particle number.
+
+## Milestone 15 — Rusanov Riemann fluxes
+
+**Status:** complete
+
+Implemented: `rusanov_momentum_flux` with \(F=\rho v^2+\kappa p\); `oned.riemann: rusanov` path that skips `cell_grad_p` / upwind to avoid double-counting; signed kin↔int exchange; config `oned_rusanov`.
+
+Verified: heating identity \(P_U=-\sum m v\dot v\); short 1D run energy-trusted.
+
+Known issues: still Local Lax–Friedrichs only; sound speed uses \(\sqrt{\kappa p/\rho}\) without \(\gamma\); not MHD.

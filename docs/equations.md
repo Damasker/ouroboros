@@ -173,6 +173,17 @@ m_i\dot v_i += -(\Phi_{\mathrm{out}}-\Phi_{\mathrm{in}}).
 
 Upwinding typically yields \(\sum m_i v_i\dot v_i^{\mathrm{flux}}\le 0\); with `thermalize_momentum_flux` that sink is deposited into cell internal energy (numerical viscosity). Classification: simplified FV — not a Riemann MHD solver.
 
+## 4h. Rusanov flux (Milestone 15)
+
+With `oned.riemann: rusanov` (\(F=\rho v^2+\kappa p\)):
+
+\[
+\frac{\Phi}{A}=\tfrac12(F_L+F_R)-\tfrac12 S(\rho v_R-\rho v_L),\qquad
+S=\max(|v_L|+c_L,|v_R|+c_R),\quad c\sim\sqrt{\kappa p/\rho}.
+\]
+
+Separate \(\nabla p\) / upwind momentum flux are disabled. Energy: \(\dot U_{\mathrm{tot}}=-\sum m_i v_i\dot v_i^{\mathrm{Rusanov}}\). Classification: simplified Local Lax–Friedrichs — not HLLC/Roe/MHD.
+
 ## 5. D–T fusion
 
 \[
