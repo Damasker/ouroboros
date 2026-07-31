@@ -11,7 +11,11 @@ The `EnergyLedger` is the primary scientific integrity mechanism. It must make c
 | `E_external_input` | input | Integrated external heating |
 | `E_fusion_total` | input (nuclear) | Full 17.6 MeV × reactions |
 | `E_alpha_to_plasma` | internal transfer | Subset of fusion → plasma |
-| `E_neutron_blanket` | output path | Subset of fusion → blanket sink |
+| `E_neutron_blanket` | output path | Legacy instant neutron→blanket sink when `blanket.enabled=false` |
+| `E_blanket` | state | Dynamic blanket thermal energy (Milestone 9) |
+| `E_neutron_leaked` | loss | Immediate neutron leakage when dynamic blanket on |
+| `E_coolant_extracted` | output | Coolant extraction from blanket thermal bin |
+| `E_neutron_produced` | accounting | Integrated neutron fusion energy (not a residual sink when dynamic) |
 | `E_magnetic` | state | \(\sum \tfrac12 L I^2\) |
 | `E_internal_plasma` | state | Thermal energy all zones |
 | `E_kinetic_flow` | state | \(\sum \tfrac12 M_{\mathrm{eff}} v^2\) |
@@ -37,7 +41,18 @@ The `EnergyLedger` is the primary scientific integrity mechanism. It must make c
 - \int_{t_0}^{t} P_{\mathrm{loss}}\,dt
 \]
 
-where \(E_{\mathrm{state}} = E_{\mathrm{internal}} + E_{\mathrm{kinetic}} + E_{\mathrm{magnetic}}\) (blanket energy is tracked in the loss/output side once deposited).
+where \(E_{\mathrm{state}} = E_{\mathrm{internal}} + E_{\mathrm{kinetic}} + E_{\mathrm{magnetic}} + E_{\mathrm{blanket}}\) (blanket term is zero when the dynamic channel is disabled).
+
+### Dynamic blanket (Milestone 9)
+
+When `blanket.enabled`:
+
+- Fraction \(f_{\mathrm{capture}}\) of neutron power deposits in \(E_{\mathrm{blanket}}\).
+- Leak \(1-f_{\mathrm{capture}}\) is an immediate loss.
+- Coolant extracts \(P_{\mathrm{cool}}=E_{\mathrm{blanket}}/\tau_{\mathrm{cool}}\) (output).
+- Residual sinks use leak + coolant (not the full produced neutron energy).
+
+When disabled: legacy instant neutron→`E_neutron_blanket` output (v1–v8 behaviour).
 
 ## Policy
 

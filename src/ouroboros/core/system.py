@@ -61,7 +61,10 @@ IDX_ACC_REC = 21
 IDX_N_HE_C = 22
 IDX_ACC_FRICTION = 23
 IDX_ACC_DRIVE = 24
-N_STATE = 25
+IDX_E_BLANKET = 25
+IDX_ACC_NEUT_LEAK = 26
+IDX_ACC_COOLANT = 27
+N_STATE = 28
 
 SERIES_KEYS = [
     "density_a",
@@ -90,6 +93,9 @@ SERIES_KEYS = [
     "controller_heater_w",
     "internal_energy_total_j",
     "kinetic_energy_j",
+    "blanket_energy_j",
+    "blanket_coolant_power_w",
+    "neutron_leak_power_w",
 ]
 
 
@@ -217,6 +223,7 @@ class LoopSystem:
         y[IDX_I_A] = cfg.throttle_a.initial_current_a
         y[IDX_I_B] = cfg.throttle_b.initial_current_a
         y[IDX_N_HE_C] = cfg.plasma.helium_fraction * nc
+        y[IDX_E_BLANKET] = cfg.blanket.initial_thermal_energy_j if cfg.blanket.enabled else 0.0
 
         self.e_state_initial = self._state_energy(y)
         return y
@@ -228,7 +235,8 @@ class LoopSystem:
         e_kin = 0.5 * m_eff * (float(y[IDX_V_A]) ** 2 + float(y[IDX_V_B]) ** 2)
         e_mag = 0.5 * cfg.throttle_a.inductance_h * float(y[IDX_I_A]) ** 2
         e_mag += 0.5 * cfg.throttle_b.inductance_h * float(y[IDX_I_B]) ** 2
-        return e_int + e_kin + e_mag
+        e_bl = float(y[IDX_E_BLANKET]) if cfg.blanket.enabled else 0.0
+        return e_int + e_kin + e_mag + e_bl
 
     def _exchange_rate(self, n_src: float, v: float, volume: float, valve: float) -> float:
         """Convective particle throughput ~ |v| / L * N * valve, L = V/A phenomenological."""
@@ -523,11 +531,22 @@ class LoopSystem:
         # Magnetic ohmic comes from magnetic energy / is dissipation — track as loss.
         # Kinetic/magnetic exchange via mutual terms is internal to state energy.
 
-        # Accumulator derivatives for ledger
+        # Accumulator derivatives for ledger + blanket channel
+        from ouroboros.core.blanket_integration import apply_blanket_ode
+
+        dEb, d_legacy, d_leak, d_cool, bpow = apply_blanket_ode(
+            cfg=cfg, neutron_power_w=p_neut, e_blanket_j=float(y[IDX_E_BLANKET])
+        )
+        dydt[IDX_E_BLANKET] = dEb
         dydt[IDX_ACC_EXT] = p_ext + p_syn
         dydt[IDX_ACC_FUS] = p_fusion
         dydt[IDX_ACC_ALPHA] = p_alpha
-        dydt[IDX_ACC_NEUT] = p_neut
+        dydt[IDX_ACC_NEUT] = p_neut  # produced
+        dydt[IDX_ACC_NEUT_LEAK] = d_leak
+        dydt[IDX_ACC_COOLANT] = d_cool
+        # When blanket off, legacy instant neutron output uses ACC_NEUT via ledger mapping;
+        # d_legacy equals p_neut and is informational only (ACC_NEUT already tracks it).
+        _ = d_legacy
         dydt[IDX_ACC_RAD] = p_rad
         dydt[IDX_ACC_TRANS] = p_trans
         dydt[IDX_ACC_WALL] = p_wall
@@ -546,13 +565,19 @@ class LoopSystem:
             loss_power_w=p_rad + p_trans + p_wall + p_exh * (1.0 - cfg.losses.recovery_fraction),
             recovered_power_w=p_rec,
             q_factor=q,
-            controller_meta=dict(self._control.metadata),
+            controller_meta={
+                **dict(self._control.metadata),
+                "blanket_coolant_w": bpow.coolant_extract_w,
+                "neutron_leak_w": bpow.leaked_w,
+            },
         )
         return dydt
 
     def ledger_from_state(self, y: np.ndarray) -> EnergyLedger:
         cfg = self.config
         m_eff = cfg.plasma.effective_inertia_kg
+        from ouroboros.core.blanket_integration import fill_neutron_ledger_fields
+
         ledger = EnergyLedger(
             e_internal_j=float(y[IDX_U_A] + y[IDX_U_B] + y[IDX_U_C] + y[IDX_U_R]),
             e_kinetic_j=0.5 * m_eff * (float(y[IDX_V_A]) ** 2 + float(y[IDX_V_B]) ** 2),
@@ -563,7 +588,6 @@ class LoopSystem:
             e_external_input_j=float(y[IDX_ACC_EXT]),
             e_fusion_total_j=float(y[IDX_ACC_FUS]),
             e_alpha_to_plasma_j=float(y[IDX_ACC_ALPHA]),
-            e_neutron_blanket_j=float(y[IDX_ACC_NEUT]),
             e_recovered_j=float(y[IDX_ACC_REC]),
             e_radiation_j=float(y[IDX_ACC_RAD]),
             e_transport_j=float(y[IDX_ACC_TRANS]),
@@ -574,22 +598,16 @@ class LoopSystem:
             e_drive_work_j=float(y[IDX_ACC_DRIVE]),
             e_state_initial_j=self.e_state_initial,
         )
-        # Closure identity (see docs/energy-accounting.md).
-        ledger.e_error_j = (
-            ledger.e_state_initial_j
-            + ledger.e_external_input_j
-            + ledger.e_fusion_total_j
-            + ledger.e_recovered_j
-            + ledger.e_drive_work_j
-            - ledger.state_energy()
-            - ledger.e_radiation_j
-            - ledger.e_transport_j
-            - ledger.e_wall_j
-            - ledger.e_exhaust_j
-            - ledger.e_neutron_blanket_j
-            - ledger.e_magnetic_loss_j
-            - ledger.e_friction_j
+        fill_neutron_ledger_fields(
+            ledger,
+            cfg=cfg,
+            e_blanket_j=float(y[IDX_E_BLANKET]),
+            acc_neut_produced_j=float(y[IDX_ACC_NEUT]),
+            acc_neut_legacy_out_j=float(y[IDX_ACC_NEUT]),
+            acc_leak_j=float(y[IDX_ACC_NEUT_LEAK]),
+            acc_coolant_j=float(y[IDX_ACC_COOLANT]),
         )
+        ledger.compute_residual()
         ledger.relative_error(cfg.energy.absolute_floor_j)
         if ledger.relative_residual > cfg.energy.relative_tolerance:
             ledger.trusted = False
@@ -644,6 +662,9 @@ class LoopSystem:
             "controller_heater_w": self._control.external_heater_w,
             "internal_energy_total_j": ledger.e_internal_j,
             "kinetic_energy_j": ledger.e_kinetic_j,
+            "blanket_energy_j": ledger.e_blanket_j,
+            "blanket_coolant_power_w": float(diag.controller_meta.get("blanket_coolant_w", 0.0)),
+            "neutron_leak_power_w": float(diag.controller_meta.get("neutron_leak_w", 0.0)),
         }
 
     def check_energy_or_raise(self, y: np.ndarray, t: float) -> EnergyLedger:

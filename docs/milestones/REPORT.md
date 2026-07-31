@@ -71,3 +71,13 @@ Implemented: consistent EM coupling (`F=-kI`, \(L I'+RI=-kv\)), anisotropic tran
 Verified: coupling power identity residual ~0; consistent-coupling passive residual trusted; multizone/1D DT demos produce nonzero fusion power.
 
 Known issues: reduced-MHD terms are placeholders; magnetic-pressure scale left at 0 by default to protect the ledger.
+
+## Milestone 9 — Blanket, campaigns, snapshot server
+
+**Status:** complete
+
+Implemented: dynamic blanket ODE (`physics/blanket.py`) with capture/leak/coolant + TBR stub; `EnergyLedger` state bin + residual mapping; wired into lumped / multizone / 1D; config `dt_blanket`; campaign runner (`ouroboros campaign`) with Cartesian sweeps + summary CSV/JSON; stdlib HTTP snapshot server (`ouroboros serve`) for 3D clients.
+
+Verified: dynamic-blanket energy closure (produced ≈ leak + coolant + \(E_b\)); legacy path unchanged when blanket off; campaign + HTTP smoke tests.
+
+Known issues: TBR is a placeholder rate, not inventory transport; HTTP server is read-only and unauthenticated.

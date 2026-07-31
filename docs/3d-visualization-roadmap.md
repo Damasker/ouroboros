@@ -37,7 +37,7 @@ Geometry is defined separately in `geometry/loop_geometry.json` (nodes, segments
 
 1. Keep v1 matplotlib schematic + 2D plots.
 2. Stabilize `snapshot_schema_version` and geometry IDs.
-3. Add optional HTTP snapshot server in `ouroboros.api` (read-only).
+3. Add optional HTTP snapshot server (`make serve` / `ouroboros serve`) — **done in Milestone 9**.
 4. Prototype Three.js viewer consuming live snapshots.
 5. Only then consider in-engine particle FX — still driven by exported fields, never by re-implementing ODEs.
 

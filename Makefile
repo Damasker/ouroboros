@@ -1,9 +1,12 @@
-.PHONY: setup test lint typecheck run-scenario visualize report demo geometry clean
+.PHONY: setup test lint typecheck run-scenario visualize report campaign serve demo geometry clean
 
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 SCENARIO ?= passive
 RUN ?=
+CAMPAIGN ?= configs/campaigns/heater_sweep.yaml
+HOST ?= 127.0.0.1
+PORT ?= 8765
 
 setup:
 	$(PIP) install -U pip
@@ -30,6 +33,12 @@ report:
 	@if [ -z "$(RUN)" ]; then echo "Usage: make report RUN=<run-id>"; exit 1; fi
 	$(PYTHON) -m ouroboros.cli --root . report --run $(RUN)
 
+campaign:
+	$(PYTHON) -m ouroboros.cli --root . campaign --campaign $(CAMPAIGN)
+
+serve:
+	$(PYTHON) -m ouroboros.cli --root . serve --host $(HOST) --port $(PORT)
+
 demo: setup
 	$(MAKE) run-scenario SCENARIO=passive
 	$(MAKE) visualize RUN=passive
@@ -44,6 +53,8 @@ demo: setup
 	$(MAKE) visualize RUN=oned-passive
 	$(MAKE) run-scenario SCENARIO=coupled-consistent
 	$(MAKE) visualize RUN=coupled-consistent
+	$(MAKE) run-scenario SCENARIO=dt-blanket
+	$(MAKE) report RUN=dt-blanket
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

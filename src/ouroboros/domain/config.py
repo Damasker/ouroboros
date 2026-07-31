@@ -153,6 +153,16 @@ class OneDSection(BaseModel):
     export_cells_in_snapshot: bool = True
 
 
+class BlanketSection(BaseModel):
+    """Neutron blanket channel (Milestone 9). Disabled = legacy instant neutron sink."""
+
+    enabled: bool = False
+    capture_fraction: float = 0.9  # phenomenological
+    coolant_time_s: float = 0.5
+    breeding_ratio: float = 1.05  # placeholder TBR
+    initial_thermal_energy_j: float = 0.0
+
+
 class SimulationConfig(BaseModel):
     simulation: SimulationSection = Field(default_factory=SimulationSection)
     geometry: GeometrySection = Field(default_factory=GeometrySection)
@@ -169,3 +179,4 @@ class SimulationConfig(BaseModel):
     multizone: MultiZoneSection = Field(default_factory=MultiZoneSection)
     oned: OneDSection = Field(default_factory=OneDSection)
     reduced_mhd: ReducedMHDSection = Field(default_factory=ReducedMHDSection)
+    blanket: BlanketSection = Field(default_factory=BlanketSection)

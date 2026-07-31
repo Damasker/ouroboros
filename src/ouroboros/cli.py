@@ -18,6 +18,7 @@ SCENARIO_CONFIGS = {
     "driven": "configs/driven.yaml",
     "synthetic-oscillation": "configs/synthetic_oscillation.yaml",
     "dt-fusion": "configs/dt_fusion.yaml",
+    "dt-blanket": "configs/dt_blanket.yaml",
     "coupled-throttle": "configs/coupled_throttle.yaml",
     "multizone-passive": "configs/multizone_passive.yaml",
     "multizone-driven": "configs/multizone_driven.yaml",
@@ -91,6 +92,11 @@ def cmd_report(args: argparse.Namespace) -> int:
         f"- scenario: {result['metadata'].get('scenario')}",
         f"- n_samples: {len(result['times_s'])}",
     ]
+    ledger = energy.get("ledger", {})
+    if ledger.get("blanket_dynamic"):
+        report_lines.append(f"- blanket_energy_j: {ledger.get('e_blanket_j', 0):.4g}")
+        report_lines.append(f"- coolant_extracted_j: {ledger.get('e_coolant_extracted_j', 0):.4g}")
+        report_lines.append(f"- neutron_leaked_j: {ledger.get('e_neutron_leaked_j', 0):.4g}")
     if series.get("q_factor"):
         qs = [q for q in series["q_factor"] if not (isinstance(q, float) and math.isnan(q))]
         if qs:
@@ -103,6 +109,42 @@ def cmd_report(args: argparse.Namespace) -> int:
     out = run_dir / "stability_report.md"
     out.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
     print(out.read_text(encoding="utf-8"))
+    return 0
+
+
+def cmd_campaign(args: argparse.Namespace) -> int:
+    from ouroboros.campaign import load_campaign, run_campaign
+
+    root = Path(args.root)
+    camp_path = Path(args.campaign)
+    if not camp_path.is_absolute():
+        camp_path = root / camp_path
+    spec = load_campaign(camp_path, root=root)
+    if args.output:
+        out = Path(args.output)
+        spec.output_dir = out if out.is_absolute() else root / out
+    summary = run_campaign(spec, write_artifacts=True)
+    print(f"campaign={summary['campaign']}")
+    print(f"n_cases={summary['n_cases']}")
+    print(f"output={spec.output_dir}")
+    return 0
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    from ouroboros.http_server import serve_snapshots
+
+    root = Path(args.root)
+    results = Path(args.results)
+    if not results.is_absolute():
+        results = root / results
+    httpd = serve_snapshots(results, host=args.host, port=args.port)
+    print(f"serving {results} on http://{args.host}:{args.port}")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("shutdown")
+    finally:
+        httpd.server_close()
     return 0
 
 
@@ -125,6 +167,17 @@ def build_parser() -> argparse.ArgumentParser:
     rep_p = sub.add_parser("report", help="Write stability report")
     rep_p.add_argument("--run", required=True)
     rep_p.set_defaults(func=cmd_report)
+
+    camp_p = sub.add_parser("campaign", help="Run a parametric campaign YAML")
+    camp_p.add_argument("--campaign", required=True, help="Path to campaign YAML")
+    camp_p.add_argument("--output", default=None, help="Override output directory")
+    camp_p.set_defaults(func=cmd_campaign)
+
+    srv_p = sub.add_parser("serve", help="HTTP snapshot server for 3D clients")
+    srv_p.add_argument("--results", default="results")
+    srv_p.add_argument("--host", default="127.0.0.1")
+    srv_p.add_argument("--port", type=int, default=8765)
+    srv_p.set_defaults(func=cmd_serve)
     return p
 
 

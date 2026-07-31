@@ -61,11 +61,11 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Reduced-MHD placeholder forces
 - Multi-zone / 1D D–T burn demo configs
 
-## Milestone 9 — Next
+## Milestone 9 — Blanket, campaigns, snapshot server
 
-- Neutron / blanket channel detail
-- Parametric campaign tooling
-- Optional HTTP snapshot server for 3D clients
+- Dynamic neutron / blanket thermal channel (`blanket.enabled`)
+- Parametric campaign runner (`make campaign`)
+- Stdlib HTTP snapshot server (`make serve`)
 
 ## Beyond
 

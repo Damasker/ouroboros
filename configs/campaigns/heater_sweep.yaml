@@ -1,0 +1,12 @@
+# Parametric campaign: sweep external heater on a short D–T run.
+name: heater_sweep
+base_config: configs/dt_fusion.yaml
+output_dir: results/campaigns/heater_sweep
+# Short duration for CI / smoke
+overrides:
+  simulation.duration_s: 0.05
+  simulation.output_interval_s: 0.01
+  numerics.max_nfev: 40000
+parameters:
+  - path: drive.external_heater_w
+    values: [1.0e5, 2.0e5, 3.0e5]

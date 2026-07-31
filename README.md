@@ -50,9 +50,19 @@ make run-scenario SCENARIO=oned-driven
 make run-scenario SCENARIO=coupled-consistent
 make run-scenario SCENARIO=multizone-dt
 make run-scenario SCENARIO=oned-dt
+make run-scenario SCENARIO=dt-blanket
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
+
+## Campaigns & snapshot server
+
+```bash
+make campaign CAMPAIGN=configs/campaigns/heater_sweep.yaml
+make serve HOST=127.0.0.1 PORT=8765
+```
+
+HTTP endpoints (read-only): `/health`, `/runs`, `/runs/<id>/snapshots`, `/runs/<id>/snapshots/latest`, `/runs/<id>/energy`.
 
 ## Visualize
 
@@ -104,10 +114,10 @@ Time series include densities, temperatures (eV display), flows, throttle curren
 
 ## Known limitations
 
-- 0D lumped zones only  
-- Magnetic throttle ↔ flow coupling is phenomenological  
-- Neutrons are an energy bin, not a blanket transport model  
-- Residual may grow when mutual inductance and magnetic force coefficients are inconsistent (documented)  
+- Lumped / multi-zone / coarse 1D models only (not reactor design tools)
+- Magnetic throttle ↔ flow coupling is phenomenological unless `coupling_mode: consistent`
+- Dynamic blanket is a thermal bin + TBR stub, not neutronics transport
+- Residual may grow when mutual inductance and magnetic force coefficients are inconsistent (documented)
 - No claim of device feasibility  
 
 ## License

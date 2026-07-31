@@ -141,10 +141,14 @@ class EnergyLedger:
     e_internal_j: float = 0.0
     e_kinetic_j: float = 0.0
     e_magnetic_j: float = 0.0
+    e_blanket_j: float = 0.0  # dynamic blanket thermal energy (Milestone 9)
     e_external_input_j: float = 0.0
     e_fusion_total_j: float = 0.0
     e_alpha_to_plasma_j: float = 0.0
-    e_neutron_blanket_j: float = 0.0
+    e_neutron_blanket_j: float = 0.0  # legacy instant neutron output when blanket disabled
+    e_neutron_produced_j: float = 0.0
+    e_neutron_leaked_j: float = 0.0
+    e_coolant_extracted_j: float = 0.0
     e_recovered_j: float = 0.0
     e_radiation_j: float = 0.0
     e_transport_j: float = 0.0
@@ -157,9 +161,10 @@ class EnergyLedger:
     e_state_initial_j: float = 0.0
     trusted: bool = True
     relative_residual: float = 0.0
+    blanket_dynamic: bool = False
 
     def state_energy(self) -> float:
-        return self.e_internal_j + self.e_kinetic_j + self.e_magnetic_j
+        return self.e_internal_j + self.e_kinetic_j + self.e_magnetic_j + self.e_blanket_j
 
     def inputs(self) -> float:
         return (
@@ -170,13 +175,18 @@ class EnergyLedger:
         )
 
     def outputs_and_losses(self) -> float:
+        neutron_out = (
+            self.e_neutron_leaked_j + self.e_coolant_extracted_j
+            if self.blanket_dynamic
+            else self.e_neutron_blanket_j
+        )
         return (
             self.e_radiation_j
             + self.e_transport_j
             + self.e_wall_j
             + self.e_exhaust_j
             + self.e_magnetic_loss_j
-            + self.e_neutron_blanket_j
+            + neutron_out
             + self.e_friction_j
         )
 

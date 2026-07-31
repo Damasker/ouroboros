@@ -63,6 +63,9 @@ class MultiZoneLayout:
     idx_acc_friction: int
     idx_acc_drive: int
     idx_n_he: int
+    idx_e_blanket: int
+    idx_acc_neut_leak: int
+    idx_acc_coolant: int
     n_state: int
 
     def idx_n(self, i: int) -> int:
@@ -95,7 +98,10 @@ def make_layout(n_zones: int) -> MultiZoneLayout:
         idx_acc_friction=acc0 + 10,
         idx_acc_drive=acc0 + 11,
         idx_n_he=acc0 + 12,
-        n_state=acc0 + 13,
+        idx_e_blanket=acc0 + 13,
+        idx_acc_neut_leak=acc0 + 14,
+        idx_acc_coolant=acc0 + 15,
+        n_state=acc0 + 16,
     )
 
 
@@ -165,6 +171,7 @@ class MultiZoneSystem:
         y[L.idx_i_b] = cfg.throttle_b.initial_current_a
         ch = self.network.zone_index[self.network.chamber_id]
         y[L.idx_n_he] = cfg.plasma.helium_fraction * y[L.idx_n(ch)]
+        y[L.idx_e_blanket] = cfg.blanket.initial_thermal_energy_j if cfg.blanket.enabled else 0.0
         self.e_state_initial = self._state_energy(y)
         return y
 
@@ -176,7 +183,8 @@ class MultiZoneSystem:
         e_kin = 0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2)
         e_mag = 0.5 * cfg.throttle_a.inductance_h * float(y[L.idx_i_a]) ** 2
         e_mag += 0.5 * cfg.throttle_b.inductance_h * float(y[L.idx_i_b]) ** 2
-        return e_int + e_kin + e_mag
+        e_bl = float(y[L.idx_e_blanket]) if cfg.blanket.enabled else 0.0
+        return e_int + e_kin + e_mag + e_bl
 
     def _path_speed(self, path: str, v_a: float, v_b: float) -> float:
         if path == "a":
@@ -401,6 +409,14 @@ class MultiZoneSystem:
         dydt[L.idx_acc_fus] = p_fusion
         dydt[L.idx_acc_alpha] = p_alpha
         dydt[L.idx_acc_neut] = p_neut
+        from ouroboros.core.blanket_integration import apply_blanket_ode
+
+        dEb, _d_legacy, d_leak, d_cool, bpow = apply_blanket_ode(
+            cfg=cfg, neutron_power_w=p_neut, e_blanket_j=float(y[L.idx_e_blanket])
+        )
+        dydt[L.idx_e_blanket] = dEb
+        dydt[L.idx_acc_neut_leak] = d_leak
+        dydt[L.idx_acc_coolant] = d_cool
         dydt[L.idx_acc_rad] = p_rad
         dydt[L.idx_acc_trans] = p_trans
         dydt[L.idx_acc_wall] = p_wall
@@ -419,7 +435,11 @@ class MultiZoneSystem:
             loss_power_w=p_rad + p_trans + p_wall + p_exh * (1.0 - cfg.losses.recovery_fraction),
             recovered_power_w=p_rec,
             q_factor=q,
-            controller_meta=dict(self._control.metadata),
+            controller_meta={
+                **dict(self._control.metadata),
+                "blanket_coolant_w": bpow.coolant_extract_w,
+                "neutron_leak_w": bpow.leaked_w,
+            },
         )
         return dydt
 
@@ -427,6 +447,8 @@ class MultiZoneSystem:
         cfg = self.config
         L = self.layout
         m_eff = cfg.plasma.effective_inertia_kg
+        from ouroboros.core.blanket_integration import fill_neutron_ledger_fields
+
         ledger = EnergyLedger(
             e_internal_j=float(sum(y[L.idx_u(i)] for i in range(L.n_zones))),
             e_kinetic_j=0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2),
@@ -437,7 +459,6 @@ class MultiZoneSystem:
             e_external_input_j=float(y[L.idx_acc_ext]),
             e_fusion_total_j=float(y[L.idx_acc_fus]),
             e_alpha_to_plasma_j=float(y[L.idx_acc_alpha]),
-            e_neutron_blanket_j=float(y[L.idx_acc_neut]),
             e_recovered_j=float(y[L.idx_acc_rec]),
             e_radiation_j=float(y[L.idx_acc_rad]),
             e_transport_j=float(y[L.idx_acc_trans]),
@@ -448,21 +469,16 @@ class MultiZoneSystem:
             e_drive_work_j=float(y[L.idx_acc_drive]),
             e_state_initial_j=self.e_state_initial,
         )
-        ledger.e_error_j = (
-            ledger.e_state_initial_j
-            + ledger.e_external_input_j
-            + ledger.e_fusion_total_j
-            + ledger.e_recovered_j
-            + ledger.e_drive_work_j
-            - ledger.state_energy()
-            - ledger.e_radiation_j
-            - ledger.e_transport_j
-            - ledger.e_wall_j
-            - ledger.e_exhaust_j
-            - ledger.e_neutron_blanket_j
-            - ledger.e_magnetic_loss_j
-            - ledger.e_friction_j
+        fill_neutron_ledger_fields(
+            ledger,
+            cfg=cfg,
+            e_blanket_j=float(y[L.idx_e_blanket]),
+            acc_neut_produced_j=float(y[L.idx_acc_neut]),
+            acc_neut_legacy_out_j=float(y[L.idx_acc_neut]),
+            acc_leak_j=float(y[L.idx_acc_neut_leak]),
+            acc_coolant_j=float(y[L.idx_acc_coolant]),
         )
+        ledger.compute_residual()
         ledger.relative_error(cfg.energy.absolute_floor_j)
         if ledger.relative_residual > cfg.energy.relative_tolerance:
             ledger.trusted = False
@@ -521,6 +537,9 @@ class MultiZoneSystem:
             "controller_heater_w": self._control.external_heater_w,
             "internal_energy_total_j": ledger.e_internal_j,
             "kinetic_energy_j": ledger.e_kinetic_j,
+            "blanket_energy_j": ledger.e_blanket_j,
+            "blanket_coolant_power_w": float(diag.controller_meta.get("blanket_coolant_w", 0.0)),
+            "neutron_leak_power_w": float(diag.controller_meta.get("neutron_leak_w", 0.0)),
             "n_zones": float(L.n_zones),
         }
         # Per-zone series for richer snapshots / analysis

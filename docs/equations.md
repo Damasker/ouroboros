@@ -47,6 +47,15 @@ Applicability: 0D well-mixed zone. Source: standard continuity bookkeeping (esta
 
 Powers in watts [W]. Neutron power from fusion is routed to the **blanket channel** and does **not** return to plasma internal energy in v1.
 
+### 2b. Dynamic blanket (Milestone 9)
+
+\[
+\frac{dE_b}{dt} = f_{\mathrm{capture}} P_n - \frac{E_b}{\tau_{\mathrm{cool}}},\qquad
+P_{\mathrm{leak}}=(1-f_{\mathrm{capture}})P_n
+\]
+
+Classification: phenomenological / simplified. Optional TBR stub scales breeding rate with captured neutron reaction rate proxy. When `blanket.enabled=false`, \(P_n\) is an instant ledger output (legacy).
+
 ## 3. Flow dynamics (inertial lumped model)
 
 \[
