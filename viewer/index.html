@@ -3,145 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ouroboros Snapshot Viewer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@600;700&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg0: #e8e2d6;
-      --bg1: #f3efe6;
-      --ink: #1c2420;
-      --muted: #5a655e;
-      --line: #2a3832;
-      --accent: #c45c26;
-      --cool: #1f6f6a;
-      --panel: rgba(255, 252, 245, 0.92);
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      min-height: 100%;
-      background:
-        radial-gradient(ellipse 80% 50% at 10% 0%, #d9e4df 0%, transparent 55%),
-        radial-gradient(ellipse 70% 45% at 90% 100%, #e8d5c4 0%, transparent 50%),
-        linear-gradient(165deg, var(--bg1), var(--bg0));
-      color: var(--ink);
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
-    }
-    .shell {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 1.25rem 1.25rem 2rem;
-    }
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 0.75rem 1.5rem;
-      margin-bottom: 1rem;
-    }
-    h1 {
-      font-family: Syne, sans-serif;
-      font-weight: 700;
-      font-size: clamp(1.6rem, 4vw, 2.4rem);
-      letter-spacing: -0.02em;
-      margin: 0;
-      color: var(--ink);
-    }
-    .tag {
-      color: var(--muted);
-      font-size: 0.8rem;
-    }
-    .controls {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-      background: var(--panel);
-      border: 1px solid color-mix(in srgb, var(--line) 18%, transparent);
-      padding: 0.85rem 1rem;
-      margin-bottom: 1rem;
-    }
-    @media (min-width: 720px) {
-      .controls { grid-template-columns: 2fr 1fr auto auto; align-items: end; }
-    }
-    label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.06em; }
-    select, input[type="range"] {
-      width: 100%;
-      font: inherit;
-      color: var(--ink);
-      background: #fff;
-      border: 1px solid color-mix(in srgb, var(--line) 25%, transparent);
-      padding: 0.4rem 0.5rem;
-    }
-    button {
-      font: inherit;
-      font-weight: 600;
-      border: 1px solid var(--line);
-      background: var(--ink);
-      color: var(--bg1);
-      padding: 0.55rem 1rem;
-      cursor: pointer;
-    }
-    button.secondary { background: transparent; color: var(--ink); }
-    button:hover { background: var(--cool); border-color: var(--cool); color: #fff; }
-    button.secondary:hover { background: color-mix(in srgb, var(--cool) 15%, transparent); color: var(--ink); }
-    .stage {
-      position: relative;
-      background: #f7f3ea;
-      border: 1px solid color-mix(in srgb, var(--line) 20%, transparent);
-      overflow: hidden;
-    }
-    canvas { display: block; width: 100%; height: auto; }
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem 1.5rem;
-      margin-top: 0.85rem;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .meta strong { color: var(--ink); font-weight: 600; }
-    .err { color: #8b1e1e; margin-top: 0.5rem; font-size: 0.85rem; }
-  </style>
+  <title>Ouroboros — Snapshot Viewer</title>
+  <meta name="description" content="Ouroboros plasma-loop snapshot viewer" />
+  <link rel="stylesheet" href="/viewer/styles.css" />
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <h1>Ouroboros</h1>
-      <span class="tag">snapshot viewer · schema 1.1.0 · <a href="/viewer/webgpu.html" style="color:var(--cool)">WebGPU</a></span>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand-block">
+        <h1 class="brand">Ouro<span>boros</span></h1>
+        <p class="tagline">snapshot viewer · schematic · schema 1.1.0</p>
+      </div>
+      <nav class="nav" aria-label="Views">
+        <a class="active" href="/viewer" aria-current="page">Schematic</a>
+        <a href="/viewer/webgpu.html">Volumetric</a>
+        <a href="/viewer/protocol.html">Protocol</a>
+      </nav>
     </header>
-    <div class="controls">
-      <div>
-        <label for="run">Run</label>
-        <select id="run"></select>
-      </div>
-      <div>
-        <label for="field">Field</label>
-        <select id="field">
-          <option value="density">density</option>
-          <option value="temperature">temperature</option>
-          <option value="flow_velocity">flow velocity</option>
-        </select>
-      </div>
-      <button id="reload" type="button" class="secondary">Reload</button>
-      <button id="play" type="button">Play</button>
+
+    <div class="workspace">
+      <aside class="rail">
+        <section class="panel">
+          <h2>Session</h2>
+          <div class="field">
+            <label for="run">Run</label>
+            <select id="run"></select>
+          </div>
+          <div class="field">
+            <label for="field">Field</label>
+            <select id="field">
+              <option value="density">Density</option>
+              <option value="temperature">Temperature</option>
+              <option value="flow_velocity">Flow velocity</option>
+            </select>
+          </div>
+          <div class="btn-row">
+            <button id="reload" type="button">Reload</button>
+            <button id="play" class="primary" type="button">Play</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Timeline</h2>
+          <div class="scrub">
+            <input id="frame" type="range" min="0" max="0" value="0" aria-label="Frame" />
+            <div class="scrub-meta">
+              <span>frame <strong id="frameLabel">0</strong></span>
+              <span id="frameMax">/ 0</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Status</h2>
+          <div class="status" id="statusPills">
+            <span class="pill" id="pillConn">connecting</span>
+            <span class="pill" id="pillFrames">0 frames</span>
+          </div>
+          <p class="hints" style="margin-top:0.75rem">
+            <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> step · <kbd>F</kbd> cycle field
+          </p>
+        </section>
+
+        <p class="err" id="err" role="alert"></p>
+      </aside>
+
+      <section class="main">
+        <div class="stage-wrap">
+          <div class="stage-badge">live schematic</div>
+          <canvas id="c" width="1000" height="560" aria-label="Plasma loop schematic"></canvas>
+          <div class="stage-empty" id="empty">
+            <div>
+              <h3>No snapshots yet</h3>
+              <p>Run a scenario, then hit Reload. Try <code>make run-scenario SCENARIO=oned-hlld</code>.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span>low</span>
+          <div class="legend-bar" aria-hidden="true"></div>
+          <span>high</span>
+        </div>
+
+        <div class="telemetry">
+          <div class="stat"><div class="k">Time</div><div class="v"><span id="tVal">—</span><em>s</em></div></div>
+          <div class="stat"><div class="k">Segments</div><div class="v" id="nSeg">—</div></div>
+          <div class="stat"><div class="k">Throttle I<sub>a</sub></div><div class="v"><span id="ia">—</span><em>A</em></div></div>
+          <div class="stat"><div class="k">Throttle I<sub>b</sub></div><div class="v"><span id="ib">—</span><em>A</em></div></div>
+        </div>
+      </section>
     </div>
-    <div>
-      <label for="frame">Frame <span id="frameLabel">0</span></label>
-      <input id="frame" type="range" min="0" max="0" value="0" />
-    </div>
-    <div class="stage">
-      <canvas id="c" width="1000" height="560"></canvas>
-    </div>
-    <div class="meta">
-      <div>t = <strong id="tVal">—</strong> s</div>
-      <div>segments = <strong id="nSeg">—</strong></div>
-      <div>I<sub>a</sub> = <strong id="ia">—</strong> A</div>
-      <div>I<sub>b</sub> = <strong id="ib">—</strong> A</div>
-    </div>
-    <div class="err" id="err"></div>
+
+    <footer class="footer">
+      <span>Ouroboros plasma loop</span>
+      <span>
+        <a href="/health">/health</a> ·
+        <a href="/runs">/runs</a> ·
+        <a href="/geometry">/geometry</a>
+      </span>
+    </footer>
   </div>
+
   <script>
     const API = "";
     const $ = (id) => document.getElementById(id);
@@ -159,15 +122,14 @@
 
     function lerp(a, b, t) { return a + (b - a) * t; }
     function hexLerp(c0, c1, t) {
-      const p = (c) => [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)];
-      const [r0,g0,b0] = p(c0), [r1,g1,b1] = p(c1);
-      const r = Math.round(lerp(r0,r1,t)), g = Math.round(lerp(g0,g1,t)), b = Math.round(lerp(b0,b1,t));
-      return `rgb(${r},${g},${b})`;
+      const p = (c) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+      const [r0, g0, b0] = p(c0), [r1, g1, b1] = p(c1);
+      return `rgb(${Math.round(lerp(r0, r1, t))},${Math.round(lerp(g0, g1, t))},${Math.round(lerp(b0, b1, t))})`;
     }
     function colorMap(t) {
       t = Math.min(1, Math.max(0, t));
-      if (t < 0.5) return hexLerp("#1f6f6a", "#d8c39a", t * 2);
-      return hexLerp("#d8c39a", "#c45c26", (t - 0.5) * 2);
+      if (t < 0.5) return hexLerp("#1a8f78", "#c9d6a8", t * 2);
+      return hexLerp("#c9d6a8", "#f0a35e", (t - 0.5) * 2);
     }
 
     async function fetchJSON(url) {
@@ -176,35 +138,47 @@
       return r.json();
     }
 
+    function setEmpty(on) {
+      $("empty").classList.toggle("visible", on);
+    }
+
     async function loadRuns() {
       const data = await fetchJSON(`${API}/runs`);
       const sel = $("run");
+      const prev = sel.value;
       sel.innerHTML = "";
       for (const run of data.runs || []) {
         const opt = document.createElement("option");
         opt.value = run.run_id;
-        opt.textContent = `${run.run_id} (${run.n_snapshots ?? "?"} frames)`;
+        const trust = run.energy_trusted === true ? " · trusted" : (run.energy_trusted === false ? " · untrusted" : "");
+        opt.textContent = `${run.run_id} · ${run.n_snapshots ?? "?"} frames${trust}`;
         sel.appendChild(opt);
       }
+      if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+      $("pillConn").textContent = "online";
+      $("pillConn").className = "pill ok";
       if (!data.runs?.length) {
         $("err").textContent = "No runs with snapshots in results/. Run a scenario first.";
+        setEmpty(true);
       }
     }
 
     async function loadGeometry() {
-      try {
-        state.geom = await fetchJSON(`${API}/geometry`);
-      } catch {
-        state.geom = null;
-      }
+      try { state.geom = await fetchJSON(`${API}/geometry`); }
+      catch { state.geom = null; }
     }
 
     async function loadRun(runId) {
+      if (!runId) { setEmpty(true); return; }
       $("err").textContent = "";
       const data = await fetchJSON(`${API}/runs/${encodeURIComponent(runId)}/snapshots`);
       state.frames = data.frames || [];
       $("frame").max = Math.max(0, state.frames.length - 1);
       $("frame").value = 0;
+      $("frameMax").textContent = `/ ${Math.max(0, state.frames.length - 1)}`;
+      $("pillFrames").textContent = `${state.frames.length} frames`;
+      $("pillFrames").className = state.frames.length ? "pill ok" : "pill warn";
+      setEmpty(!state.frames.length);
       draw(0);
     }
 
@@ -245,11 +219,18 @@
       const ctx = canvas.getContext("2d");
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
-      // subtle grid
-      ctx.strokeStyle = "rgba(42,56,50,0.08)";
+
+      // atmosphere
+      const g = ctx.createRadialGradient(w * 0.72, h * 0.48, 20, w * 0.55, h * 0.5, w * 0.55);
+      g.addColorStop(0, "rgba(62,240,200,0.08)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(232,238,242,0.04)";
       ctx.lineWidth = 1;
-      for (let x = 40; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-      for (let y = 40; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+      for (let x = 40; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 40; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
       const frame = state.frames[idx];
       $("frameLabel").textContent = String(idx);
@@ -261,36 +242,40 @@
       const [lo, hi] = fieldRange(state.frames, field);
       const segs = segmentMap(frame);
 
-      // underlay paths
-      for (const [id, pts] of Object.entries(LAYOUT)) {
-        drawPolyline(ctx, pts, w, h, "rgba(28,36,32,0.12)", 18);
+      for (const pts of Object.values(LAYOUT)) {
+        drawPolyline(ctx, pts, w, h, "rgba(232,238,242,0.08)", 22);
       }
       for (const [id, pts] of Object.entries(LAYOUT)) {
         const s = segs[id];
-        let col = "rgba(28,36,32,0.35)";
+        let col = "rgba(138,154,166,0.45)";
         if (s && Number.isFinite(Number(s[field]))) {
-          const t = (Number(s[field]) - lo) / (hi - lo);
-          col = colorMap(t);
+          col = colorMap((Number(s[field]) - lo) / (hi - lo));
         }
-        drawPolyline(ctx, pts, w, h, col, id.includes("throttle") ? 10 : 14);
+        drawPolyline(ctx, pts, w, h, col, id.includes("throttle") ? 10 : 15);
       }
 
-      // labels
-      ctx.fillStyle = "#1c2420";
-      ctx.font = "600 13px IBM Plex Mono";
-      const labels = [
-        ["branch_a", 0.40, 0.12],
-        ["branch_b", 0.40, 0.90],
-        ["chamber", 0.80, 0.48],
-        ["return", 0.05, 0.48],
-      ];
-      for (const [txt, x, y] of labels) ctx.fillText(txt, x * w, y * h);
+      ctx.fillStyle = "rgba(232,238,242,0.55)";
+      ctx.font = "600 12px JetBrains Mono, monospace";
+      for (const [txt, x, y] of [
+        ["branch_a", 0.38, 0.12],
+        ["branch_b", 0.38, 0.92],
+        ["chamber", 0.78, 0.48],
+        ["return", 0.04, 0.50],
+        ["nozzle", 0.90, 0.42],
+      ]) ctx.fillText(txt, x * w, y * h);
 
-      const comps = Object.fromEntries((frame.components || []).map(c => [c.id, c]));
+      const comps = Object.fromEntries((frame.components || []).map((c) => [c.id, c]));
       $("tVal").textContent = Number(frame.time).toFixed(4);
       $("nSeg").textContent = String((frame.segments || []).length);
       $("ia").textContent = comps.throttle_a ? Number(comps.throttle_a.current).toFixed(3) : "—";
       $("ib").textContent = comps.throttle_b ? Number(comps.throttle_b.current).toFixed(3) : "—";
+    }
+
+    function setPlaying(on) {
+      state.playing = on;
+      $("play").textContent = on ? "Pause" : "Play";
+      if (on) state.raf = requestAnimationFrame(tick);
+      else cancelAnimationFrame(state.raf);
     }
 
     function tick(ts) {
@@ -305,12 +290,23 @@
       state.raf = requestAnimationFrame(tick);
     }
 
-    $("play").onclick = () => {
-      state.playing = !state.playing;
-      $("play").textContent = state.playing ? "Pause" : "Play";
-      if (state.playing) state.raf = requestAnimationFrame(tick);
-      else cancelAnimationFrame(state.raf);
-    };
+    function step(delta) {
+      if (!state.frames.length) return;
+      const max = state.frames.length - 1;
+      let i = Number($("frame").value) + delta;
+      if (i < 0) i = max;
+      if (i > max) i = 0;
+      $("frame").value = i;
+      draw(i);
+    }
+
+    function cycleField() {
+      const sel = $("field");
+      sel.selectedIndex = (sel.selectedIndex + 1) % sel.options.length;
+      draw(Number($("frame").value));
+    }
+
+    $("play").onclick = () => setPlaying(!state.playing);
     $("frame").oninput = () => draw(Number($("frame").value));
     $("field").onchange = () => draw(Number($("frame").value));
     $("run").onchange = () => loadRun($("run").value);
@@ -319,13 +315,25 @@
       if ($("run").value) await loadRun($("run").value);
     };
 
+    window.addEventListener("keydown", (e) => {
+      if (e.target.matches("input, select, textarea")) return;
+      if (e.code === "Space") { e.preventDefault(); setPlaying(!state.playing); }
+      if (e.code === "ArrowRight") { e.preventDefault(); step(1); }
+      if (e.code === "ArrowLeft") { e.preventDefault(); step(-1); }
+      if (e.key === "f" || e.key === "F") { e.preventDefault(); cycleField(); }
+    });
+
     (async () => {
       try {
         await loadGeometry();
         await loadRuns();
         if ($("run").value) await loadRun($("run").value);
+        else setEmpty(true);
       } catch (e) {
         $("err").textContent = String(e.message || e);
+        $("pillConn").textContent = "offline";
+        $("pillConn").className = "pill err";
+        setEmpty(true);
       }
     })();
   </script>

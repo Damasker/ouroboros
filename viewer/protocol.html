@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ouroboros — Client Protocol</title>
+  <link rel="stylesheet" href="/viewer/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand-block">
+        <h1 class="brand">Ouro<span>boros</span></h1>
+        <p class="tagline">native client protocol · Godot / Unity / WebGPU</p>
+      </div>
+      <nav class="nav" aria-label="Views">
+        <a href="/viewer">Schematic</a>
+        <a href="/viewer/webgpu.html">Volumetric</a>
+        <a class="active" href="/viewer/protocol.html" aria-current="page">Protocol</a>
+      </nav>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail">
+        <section class="panel">
+          <h2>Manifest</h2>
+          <div class="status" id="pills">
+            <span class="pill" id="pill">loading</span>
+          </div>
+          <p class="hints" style="margin-top:0.85rem">
+            Stubs live in <code>clients/godot</code> and <code>clients/unity</code>.
+            Poll <code>/runs/{id}/client-stream</code> for frames.
+          </p>
+          <div class="btn-row">
+            <button id="reload" type="button">Reload</button>
+            <a href="/client/protocol" style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+              <button class="primary" type="button" style="width:100%">Raw JSON</button>
+            </a>
+          </div>
+        </section>
+        <p class="err" id="err" role="alert"></p>
+      </aside>
+
+      <section class="main">
+        <section class="panel">
+          <h2>Endpoints</h2>
+          <div class="protocol-list" id="endpoints"></div>
+        </section>
+        <section class="panel">
+          <h2>Live manifest</h2>
+          <pre class="json" id="manifest">{}</pre>
+        </section>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <span>Ouroboros plasma loop</span>
+      <span><a href="/viewer">← back to schematic</a></span>
+    </footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    async function load() {
+      $("err").textContent = "";
+      try {
+        const r = await fetch("/client/protocol");
+        if (!r.ok) throw new Error(`/client/protocol → ${r.status}`);
+        const data = await r.json();
+        $("manifest").textContent = JSON.stringify(data, null, 2);
+        $("pill").textContent = `v${data.version || "?"}`;
+        $("pill").className = "pill ok";
+        const box = $("endpoints");
+        box.innerHTML = "";
+        const eps = data.endpoints || {};
+        for (const [name, path] of Object.entries(eps)) {
+          const div = document.createElement("div");
+          div.className = "endpoint";
+          div.innerHTML = `<code>${path}</code><span>${name}</span>`;
+          box.appendChild(div);
+        }
+        if (Array.isArray(data.engines)) {
+          const eng = document.createElement("div");
+          eng.className = "endpoint";
+          eng.innerHTML = `<code>${data.engines.join(" · ")}</code><span>engines</span>`;
+          box.appendChild(eng);
+        }
+      } catch (e) {
+        $("err").textContent = String(e.message || e);
+        $("pill").textContent = "error";
+        $("pill").className = "pill err";
+      }
+    }
+
+    $("reload").onclick = load;
+    load();
+  </script>
+</body>
+</html>

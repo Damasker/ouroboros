@@ -69,7 +69,13 @@ make run-scenario SCENARIO=dt-blanket-zones
 make run-scenario SCENARIO=orbit-3dof
 ```
 
-WebGPU volumetric viewer: `http://127.0.0.1:8765/viewer/webgpu.html` (falls back to canvas if WebGPU is unavailable).
+App UI (after `make serve`):
+
+- Schematic: `http://127.0.0.1:8765/viewer`
+- Volumetric WebGPU: `http://127.0.0.1:8765/viewer/webgpu.html`
+- Protocol browser: `http://127.0.0.1:8765/viewer/protocol.html`
+
+Keyboard in schematic: `Space` play/pause, `←`/`→` step frames, `F` cycle field.
 
 Native clients: `clients/godot/`, `clients/unity/`; protocol at `/client/protocol`, stream at `/runs/<id>/client-stream`.
 
