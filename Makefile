@@ -42,6 +42,8 @@ demo: setup
 	$(MAKE) visualize RUN=multizone-passive
 	$(MAKE) run-scenario SCENARIO=oned-passive
 	$(MAKE) visualize RUN=oned-passive
+	$(MAKE) run-scenario SCENARIO=coupled-consistent
+	$(MAKE) visualize RUN=coupled-consistent
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

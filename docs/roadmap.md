@@ -54,11 +54,18 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Snapshot schema 1.1.0 with optional `cells`
 - Mass/energy conservation tests
 
-## Milestone 8 — Reduced / extended physics (next)
+## Milestone 8 — Extended physics
 
-- Stronger consistent throttle–flow coupling
-- Multi-zone / 1D D–T burn studies
-- Optional reduced MHD or anisotropic transport stubs
+- Consistent electromechanical throttle–flow coupling (`coupling_mode: consistent`)
+- Anisotropic transport stub (∥/⊥)
+- Reduced-MHD placeholder forces
+- Multi-zone / 1D D–T burn demo configs
+
+## Milestone 9 — Next
+
+- Neutron / blanket channel detail
+- Parametric campaign tooling
+- Optional HTTP snapshot server for 3D clients
 
 ## Beyond
 

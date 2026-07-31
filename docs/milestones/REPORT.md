@@ -61,3 +61,13 @@ Implemented: `OneDMesh` / `OneDSystem`, upwind FV fluxes, `simulation.model: one
 Verified: closed-loop particle conservation; energy residual trusted on passive 1D; snapshots include segment averages + cells.
 
 Known issues: velocity is still dual-path ODE (not a cell-local momentum field); CFL limited by SciPy adaptive stepping; high \(N_c\) increases stiffness.
+
+## Milestone 8 — Extended physics
+
+**Status:** complete
+
+Implemented: consistent EM coupling (`F=-kI`, \(L I'+RI=-kv\)), anisotropic transport stub, reduced-MHD placeholder forces, configs `coupled_consistent` / `multizone_dt` / `oned_dt`, shared `dual_path_throttle_step`.
+
+Verified: coupling power identity residual ~0; consistent-coupling passive residual trusted; multizone/1D DT demos produce nonzero fusion power.
+
+Known issues: reduced-MHD terms are placeholders; magnetic-pressure scale left at 0 by default to protect the ledger.

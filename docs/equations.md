@@ -87,6 +87,17 @@ E_{\mathrm{mag}} = \tfrac{1}{2} L_s I_s^2
 
 **Do not treat this as a validated magnet design model.**
 
+## 4b. Consistent electromechanical coupling (Milestone 8)
+
+\[
+F_{\mathrm{mag}}=-k_{\mathrm{em}} I,\qquad
+L\frac{dI}{dt}+R I=k_{\mathrm{em}} v
+\]
+
+Units: \(k_{\mathrm{em}}\) in N/A = V/(m/s). Then \(\frac{d}{dt}(E_{\mathrm{kin}}+E_{\mathrm{mag}})=F_{\mathrm{other}}v-I^2R\). Classification: simplified / phenomenological electromechanics. Config: `coupling_mode: consistent`.
+
+Legacy `phenomenological` mode (independent force coeff + \(M dI_p/dt\)) remains available but may leave a ledger residual.
+
 ## 5. D–T fusion
 
 \[

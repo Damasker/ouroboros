@@ -27,7 +27,7 @@ from ouroboros.domain import (
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.geometry.network import build_zone_network, load_geometry
 from ouroboros.physics.fusion import fusion_rate_per_second, get_reactivity_model
-from ouroboros.physics.losses import compute_zone_losses, magnetic_ohmic_power_w
+from ouroboros.physics.losses import compute_zone_losses
 from ouroboros.units import (
     DT_ALPHA_J,
     DT_FUSION_TOTAL_J,
@@ -317,6 +317,9 @@ class MultiZoneSystem:
                     wall_loss_coeff_s=wall_coeff,
                     exhaust_loss_coeff_s=cfg.losses.exhaust_loss_coeff_s,
                     z_eff=cfg.losses.impurity_z_eff,
+                    anisotropic_transport=cfg.losses.anisotropic_transport,
+                    tau_parallel_s=cfg.losses.tau_parallel_s,
+                    tau_perp_s=cfg.losses.tau_perp_s,
                 )
                 p_rad += losses.bremsstrahlung_w
                 p_trans += losses.transport_w
@@ -358,19 +361,7 @@ class MultiZoneSystem:
             dydt[L.idx_n(i)] += dN[i]
             dydt[L.idx_u(i)] += dU[i]
 
-        # Momentum + throttles (same phenomenological dual-path model)
-        m_eff = cfg.plasma.effective_inertia_kg
-        f_drive_a = cfg.drive.drive_force_a_n
-        f_drive_b = cfg.drive.drive_force_b_n
-        f_fric_a = -cfg.plasma.friction_coeff_kg_s * v_a
-        f_fric_b = -cfg.plasma.friction_coeff_kg_s * v_b
-        f_mag_a = -cfg.throttle_a.coupling_force_coeff_n_per_a * i_a
-        f_mag_b = -cfg.throttle_b.coupling_force_coeff_n_per_a * i_b
-        dv_a = (f_drive_a + f_fric_a + f_mag_a) / max(m_eff, 1e-30)
-        dv_b = (f_drive_b + f_fric_b + f_mag_b) / max(m_eff, 1e-30)
-        dydt[L.idx_v_a] = dv_a
-        dydt[L.idx_v_b] = dv_b
-
+        # Momentum + throttles (Milestone 8 coupling modes)
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
         if cfg.faults.force_quench_a or self.throttle_a.status == ThrottleStatus.QUENCH:
@@ -379,23 +370,32 @@ class MultiZoneSystem:
         if cfg.faults.force_quench_b or self.throttle_b.status == ThrottleStatus.QUENCH:
             rb = max(rb, cfg.throttle_b.quench_resistance_ohm)
             self.throttle_b.status = ThrottleStatus.QUENCH
-        alpha_proxy = 1.0e2
-        la = max(cfg.throttle_a.inductance_h, 1e-12)
-        lb = max(cfg.throttle_b.inductance_h, 1e-12)
-        dydt[L.idx_i_a] = (-ra * i_a - cfg.throttle_a.mutual_inductance_h * alpha_proxy * dv_a) / la
-        dydt[L.idx_i_b] = (-rb * i_b - cfg.throttle_b.mutual_inductance_h * alpha_proxy * dv_b) / lb
 
+        from ouroboros.core.dynamics import dual_path_throttle_step
+
+        da, db, p_mhd_diss = dual_path_throttle_step(
+            cfg=cfg,
+            v_a=v_a,
+            v_b=v_b,
+            i_a=i_a,
+            i_b=i_b,
+            dens_a=dens_a,
+            dens_b=dens_b,
+            resistance_a=ra,
+            resistance_b=rb,
+        )
+        dydt[L.idx_v_a] = da.dv_dt
+        dydt[L.idx_v_b] = db.dv_dt
+        dydt[L.idx_i_a] = da.dI_dt
+        dydt[L.idx_i_b] = db.dI_dt
         self.throttle_a.current_a = i_a
         self.throttle_b.current_a = i_b
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
 
-        p_mag_loss = 0.0
-        if cfg.losses.magnetic:
-            p_mag_loss = magnetic_ohmic_power_w(i_a, ra) + magnetic_ohmic_power_w(i_b, rb)
-
-        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b)
-        p_drive_work = f_drive_a * v_a + f_drive_b * v_b
+        p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
+        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + p_mhd_diss
+        p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         dydt[L.idx_acc_ext] = p_ext + p_syn
         dydt[L.idx_acc_fus] = p_fusion

@@ -61,7 +61,10 @@ class ThrottleSection(BaseModel):
     coil_turns_per_metre: float = 100.0
     initial_current_a: float = 0.0
     quench_resistance_ohm: float = 1.0
-    coupling_force_coeff_n_per_a: float = 0.0  # phenomenological F_mag; enable explicitly
+    coupling_force_coeff_n_per_a: float = 0.0  # phenomenological F_mag
+    # Milestone 8: consistent electromechanical coupling
+    coupling_mode: Literal["none", "phenomenological", "consistent"] = "none"
+    emf_coeff_v_s_per_m: float = 0.0  # k_em [V/(m/s)] = [N/A]
 
 
 class FusionSection(BaseModel):
@@ -80,6 +83,18 @@ class LossesSection(BaseModel):
     wall_loss_coeff_s: float = 1.0  # 1/tau_wall phenomenological
     exhaust_loss_coeff_s: float = 0.2
     impurity_z_eff: float = 1.0
+    # Anisotropic transport stub (Milestone 8)
+    anisotropic_transport: bool = False
+    tau_parallel_s: float = 0.05
+    tau_perp_s: float = 0.5
+
+
+class ReducedMHDSection(BaseModel):
+    """Placeholder reduced-MHD-like forces (not a real MHD model)."""
+
+    enabled: bool = False
+    magnetic_pressure_scale: float = 0.0
+    alfven_damping_fraction: float = 0.0
 
 
 class ControllerSection(BaseModel):
@@ -153,3 +168,4 @@ class SimulationConfig(BaseModel):
     faults: FaultSection = Field(default_factory=FaultSection)
     multizone: MultiZoneSection = Field(default_factory=MultiZoneSection)
     oned: OneDSection = Field(default_factory=OneDSection)
+    reduced_mhd: ReducedMHDSection = Field(default_factory=ReducedMHDSection)

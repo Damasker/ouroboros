@@ -29,7 +29,7 @@ from ouroboros.domain import (
 )
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.physics.fusion import fusion_rate_per_second, get_reactivity_model
-from ouroboros.physics.losses import compute_zone_losses, magnetic_ohmic_power_w
+from ouroboros.physics.losses import compute_zone_losses
 from ouroboros.units import (
     DT_ALPHA_J,
     DT_FUSION_TOTAL_J,
@@ -272,7 +272,6 @@ class LoopSystem:
         va_vol = cfg.geometry.branch_a_volume_m3
         vb_vol = cfg.geometry.branch_b_volume_m3
         vc = cfg.geometry.chamber_volume_m3
-        m_eff = cfg.plasma.effective_inertia_kg
 
         dens_a = n_a / va_vol
         dens_b = n_b / vb_vol
@@ -363,6 +362,9 @@ class LoopSystem:
             wall_loss_coeff_s=wall_coeff,
             exhaust_loss_coeff_s=cfg.losses.exhaust_loss_coeff_s,
             z_eff=z_eff,
+            anisotropic_transport=cfg.losses.anisotropic_transport,
+            tau_parallel_s=cfg.losses.tau_parallel_s,
+            tau_perp_s=cfg.losses.tau_perp_s,
         )
         # Small losses on branches
         temp_a = _temperature_from_energy(n_a, u_a, va_vol)
@@ -453,37 +455,7 @@ class LoopSystem:
             - carry(n_r, u_r, rate_r_to_b)
         )
 
-        # Flow dynamics + throttles
-        # Ip = α v  (phenomenological)
-        alpha_proxy = 1.0e2  # A / (m/s)
-        # Forces
-        f_drive_a = cfg.drive.drive_force_a_n
-        f_drive_b = cfg.drive.drive_force_b_n
-        f_fric_a = -cfg.plasma.friction_coeff_kg_s * v_a
-        f_fric_b = -cfg.plasma.friction_coeff_kg_s * v_b
-        # Pressure force omitted from v1 momentum (was an inconsistent energy source).
-        # Classification: simplified — pressure enters only via thermal state.
-        f_press_a = 0.0
-        f_press_b = 0.0
-        kfa = cfg.throttle_a.coupling_force_coeff_n_per_a
-        kfb = cfg.throttle_b.coupling_force_coeff_n_per_a
-        f_mag_a = -kfa * i_a
-        f_mag_b = -kfb * i_b
-
-        force_a = f_drive_a + f_fric_a + f_press_a + f_mag_a
-        force_b = f_drive_b + f_fric_b + f_press_b + f_mag_b
-        dv_a = force_a / max(m_eff, 1e-30)
-        dv_b = force_b / max(m_eff, 1e-30)
-        dydt[IDX_V_A] = dv_a
-        dydt[IDX_V_B] = dv_b
-
-        # Mechanical powers for ledger (positive dissipation / positive drive input)
-        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b)
-        p_drive_work = f_drive_a * v_a + f_drive_b * v_b
-        # Magnetic force work is exchanged with inductor only if coupling is consistent;
-        # tracked indirectly via state; residual captures phenomenological defect.
-
-        # Throttle currents
+        # Flow dynamics + throttles (Milestone 8 coupling modes)
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
         if cfg.faults.force_quench_a or self.throttle_a.status == ThrottleStatus.QUENCH:
@@ -493,14 +465,26 @@ class LoopSystem:
             rb = max(rb, cfg.throttle_b.quench_resistance_ohm)
             self.throttle_b.status = ThrottleStatus.QUENCH
 
-        la = max(cfg.throttle_a.inductance_h, 1e-12)
-        lb = max(cfg.throttle_b.inductance_h, 1e-12)
-        ma = cfg.throttle_a.mutual_inductance_h
-        mb = cfg.throttle_b.mutual_inductance_h
-        dIp_a = alpha_proxy * dv_a
-        dIp_b = alpha_proxy * dv_b
-        dydt[IDX_I_A] = (-ra * i_a - ma * dIp_a) / la
-        dydt[IDX_I_B] = (-rb * i_b - mb * dIp_b) / lb
+        from ouroboros.core.dynamics import dual_path_throttle_step
+
+        da, db, p_mhd_diss = dual_path_throttle_step(
+            cfg=cfg,
+            v_a=v_a,
+            v_b=v_b,
+            i_a=i_a,
+            i_b=i_b,
+            dens_a=dens_a,
+            dens_b=dens_b,
+            resistance_a=ra,
+            resistance_b=rb,
+        )
+        dydt[IDX_V_A] = da.dv_dt
+        dydt[IDX_V_B] = db.dv_dt
+        dydt[IDX_I_A] = da.dI_dt
+        dydt[IDX_I_B] = db.dI_dt
+
+        p_friction = cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + p_mhd_diss
+        p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         # Limit checks
         self.throttle_a.current_a = i_a
@@ -532,7 +516,7 @@ class LoopSystem:
 
         p_mag_loss = 0.0
         if cfg.losses.magnetic:
-            p_mag_loss = magnetic_ohmic_power_w(i_a, ra) + magnetic_ohmic_power_w(i_b, rb)
+            p_mag_loss = da.ohmic_power_w + db.ohmic_power_w
             if p_mag_loss == float("inf"):
                 raise NonPhysicalStateError(f"Magnetic loss overflow at t={t}")
 

@@ -47,6 +47,9 @@ make run-scenario SCENARIO=multizone-passive
 make run-scenario SCENARIO=multizone-driven
 make run-scenario SCENARIO=oned-passive
 make run-scenario SCENARIO=oned-driven
+make run-scenario SCENARIO=coupled-consistent
+make run-scenario SCENARIO=multizone-dt
+make run-scenario SCENARIO=oned-dt
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
