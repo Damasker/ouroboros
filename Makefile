@@ -59,6 +59,7 @@ demo: setup
 	$(MAKE) report RUN=reduced-mhd
 	$(MAKE) run-scenario SCENARIO=oned-cell-momentum
 	$(MAKE) run-scenario SCENARIO=oned-cell-velocity
+	$(MAKE) run-scenario SCENARIO=magnetic-nozzle
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

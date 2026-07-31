@@ -67,6 +67,7 @@ class MultiZoneLayout:
     idx_e_blanket: int
     idx_acc_neut_leak: int
     idx_acc_coolant: int
+    idx_acc_thrust: int
     n_state: int
 
     def idx_n(self, i: int) -> int:
@@ -102,7 +103,8 @@ def make_layout(n_zones: int) -> MultiZoneLayout:
         idx_e_blanket=acc0 + 13,
         idx_acc_neut_leak=acc0 + 14,
         idx_acc_coolant=acc0 + 15,
-        n_state=acc0 + 16,
+        idx_acc_thrust=acc0 + 16,
+        n_state=acc0 + 17,
     )
 
 
@@ -370,6 +372,33 @@ class MultiZoneSystem:
             dydt[L.idx_n(i)] += dN[i]
             dydt[L.idx_u(i)] += dU[i]
 
+        from ouroboros.physics.nozzle import magnetic_nozzle_powers
+
+        zid = cfg.nozzle.zone_id
+        if cfg.nozzle.enabled and zid in net.zone_index:
+            zi = net.zone_index[zid]
+            nz = magnetic_nozzle_powers(
+                n_particles=Ns[zi],
+                internal_energy_j=Us[zi],
+                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                extract_time_s=cfg.nozzle.extract_time_s,
+                extract_fraction=cfg.nozzle.extract_fraction,
+                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
+                enabled=True,
+            )
+            dydt[L.idx_n(zi)] -= nz.particle_rate_s
+            dydt[L.idx_u(zi)] -= nz.thermal_extract_w
+        else:
+            nz = magnetic_nozzle_powers(
+                n_particles=0.0,
+                internal_energy_j=0.0,
+                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                extract_time_s=cfg.nozzle.extract_time_s,
+                extract_fraction=cfg.nozzle.extract_fraction,
+                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
+                enabled=False,
+            )
+
         # Momentum + throttles (Milestone 8 coupling modes)
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
@@ -443,11 +472,12 @@ class MultiZoneSystem:
         dydt[L.idx_acc_rad] = p_rad
         dydt[L.idx_acc_trans] = p_trans
         dydt[L.idx_acc_wall] = p_wall
-        dydt[L.idx_acc_exh] = p_exh
+        dydt[L.idx_acc_exh] = p_exh + nz.waste_power_w
         dydt[L.idx_acc_magloss] = p_mag_loss
         dydt[L.idx_acc_rec] = p_rec
         dydt[L.idx_acc_friction] = p_friction
         dydt[L.idx_acc_drive] = p_drive_work
+        dydt[L.idx_acc_thrust] = nz.jet_power_w
 
         q = p_fusion / p_ext if p_ext > 1e-12 else float("nan")
         self._last_diag = InstantDiagnostics(
@@ -464,6 +494,10 @@ class MultiZoneSystem:
                 "neutron_leak_w": bpow.leaked_w,
                 "mhd_dissipative_w": step.dissipative_power_w,
                 "mhd_plasma_heating_w": step.plasma_heating_w,
+                "thrust_n": nz.thrust_n,
+                "isp_s": nz.isp_s,
+                "jet_power_w": nz.jet_power_w,
+                "nozzle_mass_flow_kg_s": nz.mass_flow_kg_s,
             },
         )
         return dydt
@@ -492,6 +526,7 @@ class MultiZoneSystem:
             e_magnetic_loss_j=float(y[L.idx_acc_magloss]),
             e_friction_j=float(y[L.idx_acc_friction]),
             e_drive_work_j=float(y[L.idx_acc_drive]),
+            e_thrust_j=float(y[L.idx_acc_thrust]),
             e_state_initial_j=self.e_state_initial,
         )
         fill_neutron_ledger_fields(
@@ -565,6 +600,10 @@ class MultiZoneSystem:
             "blanket_energy_j": ledger.e_blanket_j,
             "blanket_coolant_power_w": float(diag.controller_meta.get("blanket_coolant_w", 0.0)),
             "neutron_leak_power_w": float(diag.controller_meta.get("neutron_leak_w", 0.0)),
+            "thrust_n": float(diag.controller_meta.get("thrust_n", 0.0)),
+            "isp_s": float(diag.controller_meta.get("isp_s", 0.0)),
+            "jet_power_w": float(diag.controller_meta.get("jet_power_w", 0.0)),
+            "nozzle_mass_flow_kg_s": float(diag.controller_meta.get("nozzle_mass_flow_kg_s", 0.0)),
             "n_zones": float(L.n_zones),
         }
         # Per-zone series for richer snapshots / analysis

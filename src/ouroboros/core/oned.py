@@ -84,7 +84,8 @@ class OneDLayout:
         self.idx_e_blanket = acc0 + 13
         self.idx_acc_neut_leak = acc0 + 14
         self.idx_acc_coolant = acc0 + 15
-        self.n_state = acc0 + 16
+        self.idx_acc_thrust = acc0 + 16
+        self.n_state = acc0 + 17
 
     def idx_n(self, i: int) -> int:
         return (3 * i) if self.cell_velocity else (2 * i)
@@ -443,6 +444,36 @@ class OneDSystem:
             dydt[L.idx_n(i)] = float(dN[i])
             dydt[L.idx_u(i)] = float(dU[i])
 
+        from ouroboros.physics.nozzle import magnetic_nozzle_powers
+
+        exp_idxs = mesh.zone_cell_indices.get(cfg.nozzle.zone_id, [])
+        if cfg.nozzle.enabled and exp_idxs:
+            n_exp = float(sum(Ns[i] for i in exp_idxs))
+            u_exp = float(sum(Us[i] for i in exp_idxs))
+            nz = magnetic_nozzle_powers(
+                n_particles=n_exp,
+                internal_energy_j=u_exp,
+                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                extract_time_s=cfg.nozzle.extract_time_s,
+                extract_fraction=cfg.nozzle.extract_fraction,
+                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
+                enabled=True,
+            )
+            share_n = 1.0 / len(exp_idxs)
+            for ci in exp_idxs:
+                dydt[L.idx_n(ci)] -= share_n * nz.particle_rate_s
+                dydt[L.idx_u(ci)] -= share_n * nz.thermal_extract_w
+        else:
+            nz = magnetic_nozzle_powers(
+                n_particles=0.0,
+                internal_energy_j=0.0,
+                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                extract_time_s=cfg.nozzle.extract_time_s,
+                extract_fraction=cfg.nozzle.extract_fraction,
+                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
+                enabled=False,
+            )
+
         # Momentum / throttles
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
@@ -620,11 +651,12 @@ class OneDSystem:
         dydt[L.idx_acc_rad] = p_rad
         dydt[L.idx_acc_trans] = p_trans
         dydt[L.idx_acc_wall] = p_wall
-        dydt[L.idx_acc_exh] = p_exh
+        dydt[L.idx_acc_exh] = p_exh + nz.waste_power_w
         dydt[L.idx_acc_magloss] = p_mag_loss
         dydt[L.idx_acc_rec] = p_rec
         dydt[L.idx_acc_friction] = p_friction
         dydt[L.idx_acc_drive] = p_drive_work
+        dydt[L.idx_acc_thrust] = nz.jet_power_w
 
         q = p_fusion / p_ext if p_ext > 1e-12 else float("nan")
         self._last_diag = InstantDiagnostics(
@@ -644,6 +676,10 @@ class OneDSystem:
                 "cell_pressure_force_a_n": extra_a,
                 "cell_pressure_force_b_n": extra_b,
                 "momentum_mode": cfg.oned.momentum_mode,
+                "thrust_n": nz.thrust_n,
+                "isp_s": nz.isp_s,
+                "jet_power_w": nz.jet_power_w,
+                "nozzle_mass_flow_kg_s": nz.mass_flow_kg_s,
             },
         )
         return dydt
@@ -678,6 +714,7 @@ class OneDSystem:
             e_magnetic_loss_j=float(y[L.idx_acc_magloss]),
             e_friction_j=float(y[L.idx_acc_friction]),
             e_drive_work_j=float(y[L.idx_acc_drive]),
+            e_thrust_j=float(y[L.idx_acc_thrust]),
             e_state_initial_j=self.e_state_initial,
         )
         fill_neutron_ledger_fields(
@@ -752,6 +789,10 @@ class OneDSystem:
             "blanket_energy_j": ledger.e_blanket_j,
             "blanket_coolant_power_w": float(diag.controller_meta.get("blanket_coolant_w", 0.0)),
             "neutron_leak_power_w": float(diag.controller_meta.get("neutron_leak_w", 0.0)),
+            "thrust_n": float(diag.controller_meta.get("thrust_n", 0.0)),
+            "isp_s": float(diag.controller_meta.get("isp_s", 0.0)),
+            "jet_power_w": float(diag.controller_meta.get("jet_power_w", 0.0)),
+            "nozzle_mass_flow_kg_s": float(diag.controller_meta.get("nozzle_mass_flow_kg_s", 0.0)),
             "n_cells": float(L.n_cells),
         }
         for zid in self.mesh.zone_cell_indices:

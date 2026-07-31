@@ -54,6 +54,7 @@ make run-scenario SCENARIO=dt-blanket
 make run-scenario SCENARIO=reduced-mhd
 make run-scenario SCENARIO=oned-cell-momentum
 make run-scenario SCENARIO=oned-cell-velocity
+make run-scenario SCENARIO=magnetic-nozzle
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
@@ -122,6 +123,7 @@ Time series include densities, temperatures (eV display), flows, throttle curren
 - Lumped / multi-zone / coarse 1D models only (not reactor design tools)
 - Magnetic throttle ↔ flow coupling is phenomenological unless `coupling_mode: consistent`
 - Dynamic blanket is a thermal bin + TBR stub, not neutronics transport
+- Magnetic nozzle is a speculative extract→jet proxy, not a thruster design tool
 - Residual may grow when mutual inductance and magnetic force coefficients are inconsistent (documented)
 - No claim of device feasibility  
 

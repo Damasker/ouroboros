@@ -157,6 +157,7 @@ class EnergyLedger:
     e_magnetic_loss_j: float = 0.0
     e_friction_j: float = 0.0
     e_drive_work_j: float = 0.0  # mechanical work from external drive forces
+    e_thrust_j: float = 0.0  # directed jet energy from magnetic nozzle (Milestone 13)
     e_error_j: float = 0.0
     e_state_initial_j: float = 0.0
     trusted: bool = True
@@ -188,6 +189,7 @@ class EnergyLedger:
             + self.e_magnetic_loss_j
             + neutron_out
             + self.e_friction_j
+            + self.e_thrust_j
         )
 
     def compute_residual(self) -> float:

@@ -64,7 +64,8 @@ IDX_ACC_DRIVE = 24
 IDX_E_BLANKET = 25
 IDX_ACC_NEUT_LEAK = 26
 IDX_ACC_COOLANT = 27
-N_STATE = 28
+IDX_ACC_THRUST = 28
+N_STATE = 29
 
 SERIES_KEYS = [
     "density_a",
@@ -96,6 +97,10 @@ SERIES_KEYS = [
     "blanket_energy_j",
     "blanket_coolant_power_w",
     "neutron_leak_power_w",
+    "thrust_n",
+    "isp_s",
+    "jet_power_w",
+    "nozzle_mass_flow_kg_s",
 ]
 
 
@@ -463,6 +468,21 @@ class LoopSystem:
             - carry(n_r, u_r, rate_r_to_b)
         )
 
+        # Magnetic nozzle (lumped: chamber is the extraction proxy)
+        from ouroboros.physics.nozzle import magnetic_nozzle_powers
+
+        nz = magnetic_nozzle_powers(
+            n_particles=n_c,
+            internal_energy_j=u_c,
+            mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+            extract_time_s=cfg.nozzle.extract_time_s,
+            extract_fraction=cfg.nozzle.extract_fraction,
+            magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
+            enabled=cfg.nozzle.enabled,
+        )
+        dydt[IDX_N_C] -= nz.particle_rate_s
+        dydt[IDX_U_C] -= nz.thermal_extract_w
+
         # Flow dynamics + throttles (Milestone 8 coupling modes)
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
@@ -566,11 +586,12 @@ class LoopSystem:
         dydt[IDX_ACC_RAD] = p_rad
         dydt[IDX_ACC_TRANS] = p_trans
         dydt[IDX_ACC_WALL] = p_wall
-        dydt[IDX_ACC_EXH] = p_exh  # gross exhaust before recovery (recovery credited separately)
+        dydt[IDX_ACC_EXH] = p_exh + nz.waste_power_w
         dydt[IDX_ACC_MAGLOSS] = p_mag_loss
         dydt[IDX_ACC_REC] = p_rec
         dydt[IDX_ACC_FRICTION] = p_friction
         dydt[IDX_ACC_DRIVE] = p_drive_work
+        dydt[IDX_ACC_THRUST] = nz.jet_power_w
 
         q = p_fusion / p_ext if p_ext > 1e-12 else float("nan")
         self._last_diag = InstantDiagnostics(
@@ -589,6 +610,10 @@ class LoopSystem:
                 "mhd_plasma_heating_w": step.plasma_heating_w,
                 "mhd_force_a_n": step.mhd.force_a_n,
                 "mhd_force_b_n": step.mhd.force_b_n,
+                "thrust_n": nz.thrust_n,
+                "isp_s": nz.isp_s,
+                "jet_power_w": nz.jet_power_w,
+                "nozzle_mass_flow_kg_s": nz.mass_flow_kg_s,
             },
         )
         return dydt
@@ -616,6 +641,7 @@ class LoopSystem:
             e_magnetic_loss_j=float(y[IDX_ACC_MAGLOSS]),
             e_friction_j=float(y[IDX_ACC_FRICTION]),
             e_drive_work_j=float(y[IDX_ACC_DRIVE]),
+            e_thrust_j=float(y[IDX_ACC_THRUST]),
             e_state_initial_j=self.e_state_initial,
         )
         fill_neutron_ledger_fields(
@@ -685,6 +711,10 @@ class LoopSystem:
             "blanket_energy_j": ledger.e_blanket_j,
             "blanket_coolant_power_w": float(diag.controller_meta.get("blanket_coolant_w", 0.0)),
             "neutron_leak_power_w": float(diag.controller_meta.get("neutron_leak_w", 0.0)),
+            "thrust_n": float(diag.controller_meta.get("thrust_n", 0.0)),
+            "isp_s": float(diag.controller_meta.get("isp_s", 0.0)),
+            "jet_power_w": float(diag.controller_meta.get("jet_power_w", 0.0)),
+            "nozzle_mass_flow_kg_s": float(diag.controller_meta.get("nozzle_mass_flow_kg_s", 0.0)),
         }
 
     def check_energy_or_raise(self, y: np.ndarray, t: float) -> EnergyLedger:

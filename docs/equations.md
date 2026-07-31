@@ -147,6 +147,20 @@ m_i\dot V_i=F_i+F_{\mathrm{fric},i}+F_{\mathrm{drive},i}+F_{\mathrm{mag},i}.
 
 Compressional exchange: \(\dot U_i=-F_i^{\mathrm{pressure}} V_i\). Throttle circuits couple to mass-weighted path means. Classification: simplified 1D FV momentum — not a Riemann MHD solver.
 
+## 4f. Magnetic nozzle (Milestone 13)
+
+From zone inventory \(N,U\) (expansion zone, or chamber in lumped):
+
+\[
+\dot N_{\mathrm{ex}}=f\frac{N}{\tau},\qquad
+P_{\mathrm{th}}=\frac{U}{N}\dot N_{\mathrm{ex}},\qquad
+P_{\mathrm{jet}}=\eta P_{\mathrm{th}},\qquad
+P_{\mathrm{waste}}=(1-\eta)P_{\mathrm{th}}.
+\]
+
+Then \(\dot m=m_p\dot N_{\mathrm{ex}}\), \(v_{\mathrm{ex}}=\sqrt{2P_{\mathrm{jet}}/\dot m}\), \(T=\dot m\,v_{\mathrm{ex}}\), \(I_{\mathrm{sp}}=v_{\mathrm{ex}}/g_0\).
+Ledger: \(E_{\mathrm{thrust}}=\int P_{\mathrm{jet}}\) (output), waste adds to exhaust. Classification: **phenomenological / speculative**.
+
 ## 5. D–T fusion
 
 \[

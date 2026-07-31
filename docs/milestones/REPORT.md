@@ -111,3 +111,13 @@ Implemented: `OneDLayout` cell-velocity packing \((N,U,V)\) per cell; FV \(-\nab
 Verified: heating identity; inertia partition; short 1D run energy-trusted with `cell_velocity:*` series.
 
 Known issues: no momentum advection / Riemann fluxes; chamber/return cells lack path-throttle forces by design.
+
+## Milestone 13 — Magnetic nozzle / thrust channel
+
+**Status:** complete
+
+Implemented: `physics/nozzle.py` extract→jet/waste split; `EnergyLedger.e_thrust_j`; wired into lumped (chamber proxy), multizone, and 1D expansion cells; config `magnetic_nozzle`; series `thrust_n`, `isp_s`, `jet_power_w`.
+
+Verified: jet+waste = extracted enthalpy; multizone demo energy-trusted with nonzero thrust.
+
+Known issues: coefficients are speculative; not a de Laval / MHD nozzle design tool; no vehicle trajectory.

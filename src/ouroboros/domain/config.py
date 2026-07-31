@@ -173,6 +173,16 @@ class BlanketSection(BaseModel):
     initial_thermal_energy_j: float = 0.0
 
 
+class NozzleSection(BaseModel):
+    """Magnetic nozzle / directed exhaust (Milestone 13). Speculative propulsion proxy."""
+
+    enabled: bool = False
+    zone_id: str = "expansion"  # multizone/oned; lumped uses chamber
+    extract_fraction: float = 0.05  # fraction of zone inventory per extract_time
+    extract_time_s: float = 0.2
+    magnetic_efficiency: float = 0.6  # jet / extracted enthalpy
+
+
 class SimulationConfig(BaseModel):
     simulation: SimulationSection = Field(default_factory=SimulationSection)
     geometry: GeometrySection = Field(default_factory=GeometrySection)
@@ -190,3 +200,4 @@ class SimulationConfig(BaseModel):
     oned: OneDSection = Field(default_factory=OneDSection)
     reduced_mhd: ReducedMHDSection = Field(default_factory=ReducedMHDSection)
     blanket: BlanketSection = Field(default_factory=BlanketSection)
+    nozzle: NozzleSection = Field(default_factory=NozzleSection)

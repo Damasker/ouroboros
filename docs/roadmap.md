@@ -85,9 +85,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Face \(-\nabla p\) forces, distributed friction / drive / throttle coupling
 - Advection uses cell velocities; config `oned_cell_velocity`
 
+## Milestone 13 — Magnetic nozzle / thrust channel
+
+- Phenomenological nozzle extract from expansion zone (chamber proxy in lumped)
+- Ledger `e_thrust_j` + waste→exhaust; series thrust / I_sp / jet power
+- Config `magnetic_nozzle`
+
 ## Beyond
 
 - Momentum-flux Riemann / wave MHD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
-- Magnetic nozzle / propulsion config (separate product line)
+- Higher-fidelity nozzle / spacecraft trajectory coupling
