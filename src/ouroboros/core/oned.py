@@ -370,6 +370,7 @@ class OneDSystem:
             self.throttle_b.status = ThrottleStatus.QUENCH
 
         from ouroboros.core.dynamics import dual_path_throttle_step
+        from ouroboros.physics.momentum import path_pressure_forces_from_cells
 
         def zone_pressure(zid: str, fallback: float) -> float:
             dens_z, temp_ev = self._zone_mean(y, zid)
@@ -382,6 +383,24 @@ class OneDSystem:
         p_a = zone_pressure("branch_a", p_c)
         p_b = zone_pressure("branch_b", p_c)
         p_r = zone_pressure("return_channel", p_c)
+
+        cell_pressures = [
+            pressure_pa(float(dens[i]), float(temps[i]), float(dens[i]), float(temps[i]))
+            for i in range(L.n_cells)
+        ]
+        extra_a = extra_b = 0.0
+        cell_heat: tuple[float, ...] = tuple(0.0 for _ in range(L.n_cells))
+        if cfg.oned.momentum_mode == "cell_pressure":
+            ppf = path_pressure_forces_from_cells(
+                mesh,
+                pressures_pa=cell_pressures,
+                scale=cfg.oned.pressure_force_scale,
+                v_a=v_a,
+                v_b=v_b,
+            )
+            extra_a, extra_b = ppf.force_a_n, ppf.force_b_n
+            if cfg.oned.compressional_exchange:
+                cell_heat = ppf.cell_heating_w
 
         step = dual_path_throttle_step(
             cfg=cfg,
@@ -397,6 +416,8 @@ class OneDSystem:
             p_b_pa=p_b,
             p_c_pa=p_c,
             p_r_pa=p_r,
+            extra_force_a_n=extra_a,
+            extra_force_b_n=extra_b,
         )
         da, db = step.path_a, step.path_b
         dydt[L.idx_v_a] = da.dv_dt
@@ -407,6 +428,9 @@ class OneDSystem:
             share = step.plasma_heating_w / len(ch_cells)
             for ci in ch_cells:
                 dydt[L.idx_u(ci)] += share
+        for i, hw in enumerate(cell_heat):
+            if hw != 0.0:
+                dydt[L.idx_u(i)] += hw
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
 
@@ -452,6 +476,8 @@ class OneDSystem:
                 "neutron_leak_w": bpow.leaked_w,
                 "mhd_dissipative_w": step.dissipative_power_w,
                 "mhd_plasma_heating_w": step.plasma_heating_w,
+                "cell_pressure_force_a_n": extra_a,
+                "cell_pressure_force_b_n": extra_b,
             },
         )
         return dydt

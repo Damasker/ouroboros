@@ -27,6 +27,7 @@ SCENARIO_CONFIGS = {
     "coupled-consistent": "configs/coupled_consistent.yaml",
     "multizone-dt": "configs/multizone_dt.yaml",
     "oned-dt": "configs/oned_dt.yaml",
+    "oned-cell-momentum": "configs/oned_cell_momentum.yaml",
     "reduced-mhd": "configs/reduced_mhd.yaml",
     "fault-block-a": "configs/faults/block_branch_a.yaml",
     "fault-quench": "configs/faults/quench.yaml",
@@ -138,8 +139,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
     results = Path(args.results)
     if not results.is_absolute():
         results = root / results
-    httpd = serve_snapshots(results, host=args.host, port=args.port)
-    print(f"serving {results} on http://{args.host}:{args.port}")
+    httpd = serve_snapshots(
+        results, host=args.host, port=args.port, project_root=root
+    )
+    print(f"serving {results} on http://{args.host}:{args.port}/")
+    print(f"viewer  http://{args.host}:{args.port}/viewer")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

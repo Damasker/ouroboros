@@ -91,3 +91,13 @@ Implemented: force-channel split in `physics/reduced_mhd.py` (Alfvén drag → f
 Verified: energy residual trusted with nonzero `magnetic_pressure_scale` when `compressional_exchange: true`; unit tests for force signs and exchange identity.
 
 Known issues: still not a real MHD solver (no waves, no cell-local \(\mathbf{v}\)); pressure drive is lumped phenomenological.
+
+## Milestone 11 — Cell-pressure momentum + snapshot viewer
+
+**Status:** complete
+
+Implemented: `physics/momentum.py` face \(\Delta p\,A\) → path forces with per-cell compressional heating; `oned.momentum_mode: cell_pressure`; config `oned_cell_momentum`; HTML canvas viewer under `viewer/` served at `/viewer` plus `/geometry` endpoint.
+
+Verified: cell-pressure heating identity \(\sum P_{\mathrm{heat}}=-(F_a v_a+F_b v_b)\); 1D energy trusted; viewer + geometry HTTP smoke tests.
+
+Known issues: path velocities remain two ODEs (not per-cell \(v\)); viewer is a 2D schematic, not a full 3D client.

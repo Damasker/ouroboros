@@ -125,6 +125,16 @@ P_{\mathrm{heat}}=-(F_{\mathrm{mp}}+F_p)\cdot v
 
 from these forces alone (Alfvén drag still leaves via the ledger). Disable exchange only for legacy comparisons — residual may grow.
 
+## 4d. 1D cell-pressure path forces (Milestone 11)
+
+For `oned.momentum_mode: cell_pressure`, each mesh face contributes
+
+\[
+F_{\mathrm{face}}=\kappa(p_L-p_R)A
+\]
+
+summed onto path A/B (common faces split ½). Face work \(F_{\mathrm{face}} u_{\mathrm{path}}\) is removed equally from the two adjacent cell internal energies. Classification: simplified hydro mapped onto dual-path ODEs — **not** a cell-local velocity field.
+
 ## 5. D–T fusion
 
 \[

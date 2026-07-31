@@ -73,9 +73,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Nonzero `magnetic_pressure_scale` with trusted EnergyLedger when `compressional_exchange: true`
 - Demo config `reduced_mhd`
 
+## Milestone 11 — Cell-pressure momentum + snapshot viewer
+
+- `oned.momentum_mode: cell_pressure` — face \(\Delta p\,A\) integrated onto dual paths
+- Compressional cell heating for ledger closure
+- Browser viewer at `/viewer` (served by `make serve`)
+
 ## Beyond
 
-- Full reduced MHD / cell-local momentum field
+- Full cell-local velocity state / wave MHD
 - Particle / Monte Carlo neutrons
-- 3D visualization client on snapshot API
+- Game-engine (Godot/Unity) client
 - Magnetic nozzle / propulsion config (separate product line)

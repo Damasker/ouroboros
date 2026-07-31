@@ -151,11 +151,16 @@ class MultiZoneSection(BaseModel):
 
 
 class OneDSection(BaseModel):
-    """Options for simulation.model == oned (Milestone 7)."""
+    """Options for simulation.model == oned (Milestone 7+)."""
 
     geometry_file: str | None = "geometry/loop_geometry.json"
     cells_per_segment: int = 4
     export_cells_in_snapshot: bool = True
+    # Milestone 11: dual_path (default) | cell_pressure (face Δp·A → path forces)
+    momentum_mode: Literal["dual_path", "cell_pressure"] = "dual_path"
+    pressure_force_scale: float = 1.0e-6
+    # When cell_pressure: exchange face work with cell U (ledger-safe)
+    compressional_exchange: bool = True
 
 
 class BlanketSection(BaseModel):

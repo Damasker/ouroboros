@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -22,7 +23,6 @@ def _list_runs(results_root: Path) -> list[dict[str, Any]]:
         snap = p / "snapshots.jsonl"
         energy = p / "energy_report.json"
         if not snap.exists() and not energy.exists():
-            # Campaign dirs nest runs; skip non-run folders without artifacts
             continue
         entry: dict[str, Any] = {"run_id": p.name, "path": str(p)}
         if energy.exists():
@@ -63,8 +63,15 @@ def _latest_frame(path: Path) -> dict[str, Any] | None:
     return last
 
 
-def make_handler(results_root: Path) -> type[BaseHTTPRequestHandler]:
+def make_handler(
+    results_root: Path,
+    *,
+    project_root: Path | None = None,
+    viewer_dir: Path | None = None,
+) -> type[BaseHTTPRequestHandler]:
     root = results_root.resolve()
+    proj = (project_root or root.parent).resolve()
+    viewer = (viewer_dir or (proj / "viewer")).resolve()
 
     class SnapshotHandler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args: Any) -> None:
@@ -86,13 +93,59 @@ def make_handler(results_root: Path) -> type[BaseHTTPRequestHandler]:
         def _not_found(self, msg: str = "not found") -> None:
             self._send(404, {"error": msg})
 
+        def _send_file(self, path: Path) -> None:
+            if not path.is_file():
+                self._not_found(str(path.name))
+                return
+            ctype, _ = mimetypes.guess_type(str(path))
+            self._send(200, path.read_bytes(), content_type=ctype or "application/octet-stream")
+
         def do_GET(self) -> None:  # noqa: N802
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/") or "/"
             qs = parse_qs(parsed.query)
 
-            if path in ("/", "/health"):
-                self._send(200, {"status": "ok", "results_root": str(root)})
+            if path == "/health":
+                self._send(
+                    200,
+                    {
+                        "status": "ok",
+                        "results_root": str(root),
+                        "viewer": str(viewer),
+                    },
+                )
+                return
+
+            if path in ("/", "/viewer"):
+                index = viewer / "index.html"
+                if index.exists():
+                    self._send_file(index)
+                    return
+                self._send(
+                    200,
+                    {
+                        "status": "ok",
+                        "message": "Viewer not installed; use /runs API",
+                        "results_root": str(root),
+                    },
+                )
+                return
+
+            if path.startswith("/viewer/"):
+                rel = path[len("/viewer/") :]
+                target = (viewer / rel).resolve()
+                if not str(target).startswith(str(viewer)) or not target.is_file():
+                    self._not_found(rel)
+                    return
+                self._send_file(target)
+                return
+
+            if path == "/geometry":
+                geom = proj / "geometry" / "loop_geometry.json"
+                if not geom.exists():
+                    self._not_found("geometry/loop_geometry.json")
+                    return
+                self._send(200, json.loads(geom.read_text(encoding="utf-8")))
                 return
 
             if path == "/runs":
@@ -164,13 +217,19 @@ def serve_snapshots(
     *,
     host: str = "127.0.0.1",
     port: int = 8765,
+    project_root: str | Path | None = None,
+    viewer_dir: str | Path | None = None,
 ) -> ThreadingHTTPServer:
     """Create and return a bound HTTP server (caller runs serve_forever)."""
     root = Path(results_root)
     root.mkdir(parents=True, exist_ok=True)
-    handler = make_handler(root)
+    proj = Path(project_root) if project_root is not None else root.parent
+    viewer = Path(viewer_dir) if viewer_dir is not None else proj / "viewer"
+    handler = make_handler(root, project_root=proj, viewer_dir=viewer)
     httpd = ThreadingHTTPServer((host, port), handler)
-    logger.info("Snapshot server listening on http://%s:%d (root=%s)", host, port, root)
+    logger.info(
+        "Snapshot server http://%s:%d (results=%s viewer=%s)", host, port, root, viewer
+    )
     return httpd
 
 
@@ -184,8 +243,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8765)
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    results = Path(args.root) / args.results
-    httpd = serve_snapshots(results, host=args.host, port=args.port)
+    project = Path(args.root)
+    results = project / args.results
+    httpd = serve_snapshots(results, host=args.host, port=args.port, project_root=project)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

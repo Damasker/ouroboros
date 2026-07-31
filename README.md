@@ -52,6 +52,7 @@ make run-scenario SCENARIO=multizone-dt
 make run-scenario SCENARIO=oned-dt
 make run-scenario SCENARIO=dt-blanket
 make run-scenario SCENARIO=reduced-mhd
+make run-scenario SCENARIO=oned-cell-momentum
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
@@ -63,7 +64,9 @@ make campaign CAMPAIGN=configs/campaigns/heater_sweep.yaml
 make serve HOST=127.0.0.1 PORT=8765
 ```
 
-HTTP endpoints (read-only): `/health`, `/runs`, `/runs/<id>/snapshots`, `/runs/<id>/snapshots/latest`, `/runs/<id>/energy`.
+Open the schematic viewer at `http://127.0.0.1:8765/viewer`.
+
+HTTP endpoints (read-only): `/health`, `/viewer`, `/geometry`, `/runs`, `/runs/<id>/snapshots[/latest]`, `/energy`.
 
 ## Visualize
 

@@ -42,12 +42,16 @@ def dual_path_throttle_step(
     p_b_pa: float = 0.0,
     p_c_pa: float = 0.0,
     p_r_pa: float = 0.0,
+    extra_force_a_n: float = 0.0,
+    extra_force_b_n: float = 0.0,
 ) -> DualPathStep:
     """
     Momentum/throttle derivatives for paths A/B including reduced-MHD channels.
 
     Dissipative Alfvén power → friction ledger.
     Magnetic-pressure + Δp·A work → plasma internal energy when compressional_exchange.
+    extra_force_* are additional path forces (e.g. cell-pressure integration) already
+    accounted for by the caller for compressional heating.
     """
     mhd = compute_reduced_mhd_forces(
         v_a=v_a,
@@ -70,8 +74,18 @@ def dual_path_throttle_step(
         p_c_pa=p_c_pa,
         p_r_pa=p_r_pa,
     )
-    f_other_a = cfg.drive.drive_force_a_n - cfg.plasma.friction_coeff_kg_s * v_a + mhd.force_a_n
-    f_other_b = cfg.drive.drive_force_b_n - cfg.plasma.friction_coeff_kg_s * v_b + mhd.force_b_n
+    f_other_a = (
+        cfg.drive.drive_force_a_n
+        - cfg.plasma.friction_coeff_kg_s * v_a
+        + mhd.force_a_n
+        + extra_force_a_n
+    )
+    f_other_b = (
+        cfg.drive.drive_force_b_n
+        - cfg.plasma.friction_coeff_kg_s * v_b
+        + mhd.force_b_n
+        + extra_force_b_n
+    )
     da = path_throttle_rhs(
         velocity_m_s=v_a,
         current_a=i_a,
