@@ -40,6 +40,7 @@ serve:
 	$(PYTHON) -m ouroboros.cli --root . serve --host $(HOST) --port $(PORT)
 
 # Build static gallery for GitHub Pages / ouroboros.beart.cc
+# WRITE_CNAME=1 only after DNS CNAME ouroboros → damasker.github.io exists
 DOMAIN ?= ouroboros.beart.cc
 publish-site:
 	$(PYTHON) scripts/export_public_site.py --root . --out site --domain $(DOMAIN)
