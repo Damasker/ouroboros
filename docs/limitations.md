@@ -1,7 +1,7 @@
 # Limitations
 
 1. **Not a reactor design tool.** Results must not be interpreted as evidence of engineering feasibility.
-2. **0D / multi-zone 0D only.** No 1D advection PDE yet, no MHD stability, no turbulence cascade, no realistic divertor physics. Multi-zone exchange uses phenomenological \(|v|/L\) rates.
+2. **0D / multi-zone 0D / simplified 1D only.** 1D uses upwind FV with dual-path velocities — not a full compressible MHD pipe model. No turbulence cascade, no realistic divertor physics.
 3. **Phenomenological throttles.** Mutual inductance coupling to flow is a research toy model.
 4. **Fixed geometry volumes.** Compression work terms are simplified or optional.
 5. **Single reactivity channel (D–T).** No D–D, T–T, or advanced fuels in v1.

@@ -46,14 +46,22 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Passive / driven multizone configs
 - Energy ledger closure on the zone network
 
-## Milestone 7 — 1D loop discretization (next)
+## Milestone 7 — 1D loop discretization
 
-- Advective transport along segment centerlines
-- Map multi-zone state ↔ 1D cells
-- Keep EnergyLedger and snapshot contract
+- `simulation.model: oned`
+- Finite-volume cells along segment centerlines
+- Upwind advection of \(N\) and \(U\)
+- Snapshot schema 1.1.0 with optional `cells`
+- Mass/energy conservation tests
+
+## Milestone 8 — Reduced / extended physics (next)
+
+- Stronger consistent throttle–flow coupling
+- Multi-zone / 1D D–T burn studies
+- Optional reduced MHD or anisotropic transport stubs
 
 ## Beyond
 
-- Reduced MHD
+- Full reduced MHD
 - Particle / Monte Carlo neutrons
 - Magnetic nozzle / propulsion config (separate product line)

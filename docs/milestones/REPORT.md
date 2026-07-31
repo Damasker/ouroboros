@@ -51,3 +51,13 @@ Implemented: `ZoneNetwork` from geometry, `MultiZoneSystem`, `simulation.model` 
 Verified: particle conservation without sources; energy residual within tolerance on passive multizone; snapshots contain ≥8 segment IDs.
 
 Known issues: exchange rates remain phenomenological (`|v|/L`); dual-path velocities are still two ODEs (not a full 1D field); 1D advection deferred to Milestone 7.
+
+## Milestone 7 — 1D discretization
+
+**Status:** complete
+
+Implemented: `OneDMesh` / `OneDSystem`, upwind FV fluxes, `simulation.model: oned`, configs `oned_passive` / `oned_driven`, snapshot schema **1.1.0** with optional `cells`, cell density plots, conservation tests.
+
+Verified: closed-loop particle conservation; energy residual trusted on passive 1D; snapshots include segment averages + cells.
+
+Known issues: velocity is still dual-path ODE (not a cell-local momentum field); CFL limited by SciPy adaptive stepping; high \(N_c\) increases stiffness.

@@ -45,6 +45,8 @@ make run-scenario SCENARIO=synthetic-oscillation
 make run-scenario SCENARIO=dt-fusion
 make run-scenario SCENARIO=multizone-passive
 make run-scenario SCENARIO=multizone-driven
+make run-scenario SCENARIO=oned-passive
+make run-scenario SCENARIO=oned-driven
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.

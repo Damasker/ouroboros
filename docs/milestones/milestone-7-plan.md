@@ -12,8 +12,6 @@ Introduce a conservative 1D discretization along segment centerlines **without b
 4. Reduce 1D fields → segment averages for JSONL snapshots (schema stays v1.0.0; optional `cells` array later with schema bump).
 5. Property tests: discrete mass/energy conservation with periodic/closed loop BCs.
 
-## Non-goals
+## Status
 
-- Full MHD
-- Unstructured 2D/3D mesh
-- Changing public CLI for existing scenarios
+**Complete** — see `docs/milestones/REPORT.md` (Milestone 7).

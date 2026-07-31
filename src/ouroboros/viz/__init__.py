@@ -168,6 +168,24 @@ def plot_all(run_dir: str | Path) -> list[Path]:
         _save(fig, p)
         written.append(p)
 
+    # 1D cell density along branch_a if present
+    cell_a = sorted(
+        (k for k in data if k.startswith("cell_density:branch_a:")),
+        key=lambda s: int(s.rsplit(":", 1)[1]),
+    )
+    if cell_a:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        for k in cell_a:
+            ax.plot(t, data[k], label=k.split(":")[-1])
+        ax.set_xlabel("t [s]")
+        ax.set_ylabel("n [m^-3]")
+        ax.set_title("1D cells: branch_a density")
+        ax.legend(title="cell")
+        ax.grid(True, alpha=0.3)
+        p = out_dir / "oned_branch_a_cells.png"
+        _save(fig, p)
+        written.append(p)
+
     manifest = {"plots": [str(x.name) for x in written]}
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return written

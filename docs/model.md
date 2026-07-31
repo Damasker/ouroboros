@@ -60,5 +60,6 @@ A spatial loop description (nodes, segments, radii, orientations) is maintained 
 |--------------------|-------------|
 | `lumped` (default) | Fixed A/B/chamber/return bookkeeping (`LoopSystem`) |
 | `multizone` | One zone per geometry segment; exchange along loop edges (`MultiZoneSystem`) |
+| `oned` | Finite-volume cells along segment centerlines (`OneDSystem`) |
 
-Coordinates still do **not** enter the RHS (no 1D advection PDE yet). Volumes are scaled from geometric \(\pi r^2 L\) to match config role totals.
+For `lumped`/`multizone`, coordinates do **not** enter the RHS. For `oned`, cells are ordered along segment length and exchange via upwind fluxes; dual-path velocities \(v_a,v_b\) remain ODEs (simplified).

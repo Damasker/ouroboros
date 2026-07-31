@@ -40,6 +40,8 @@ demo: setup
 	$(MAKE) report RUN=dt-fusion
 	$(MAKE) run-scenario SCENARIO=multizone-passive
 	$(MAKE) visualize RUN=multizone-passive
+	$(MAKE) run-scenario SCENARIO=oned-passive
+	$(MAKE) visualize RUN=oned-passive
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

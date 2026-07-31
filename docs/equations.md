@@ -8,6 +8,20 @@ When `simulation.model: multizone`, each geometry segment is a zone. Directed ed
 
 Volumes are role-scaled from geometric \(\pi r^2 L\) to match `geometry.*_volume_m3` totals.
 
+## 0b. 1D finite volume (Milestone 7)
+
+Each segment is split into \(N_c\) cells. Face particle flux (upwind):
+
+\[
+\phi_N = u_{\mathrm{eff}}\, A\, n_{\mathrm{upwind}}
+\]
+
+\[
+\phi_E = \phi_N \cdot (U/N)_{\mathrm{upwind}}
+\]
+
+Classification: simplified physics. Dual-path velocities and throttles remain as in the multi-zone model. Snapshot schema **1.1.0** adds optional `cells[]` while keeping segment averages.
+
 ## 1. Particle balance (per zone)
 
 \[

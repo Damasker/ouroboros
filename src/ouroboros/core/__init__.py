@@ -15,6 +15,7 @@ from ouroboros.core.exceptions import (
     SimulationAbortError,
 )
 from ouroboros.core.multizone import MultiZoneSystem
+from ouroboros.core.oned import OneDSystem
 from ouroboros.core.system import SERIES_KEYS, LoopSystem
 from ouroboros.domain import EnergyLedger, EventSeverity, SimulationEvent, SimulationResult
 from ouroboros.domain.config import SimulationConfig
@@ -34,6 +35,8 @@ class SupportsSimulation(Protocol):
 
 
 def build_system(config: SimulationConfig) -> SupportsSimulation:
+    if config.simulation.model == "oned":
+        return OneDSystem(config)
     if config.simulation.model == "multizone":
         return MultiZoneSystem(config)
     return LoopSystem(config)
@@ -119,6 +122,7 @@ def run_simulation(
     series: dict[str, list[float]] = {}
     energy_trusted = True
     zone_snapshots: list[list[dict[str, Any]]] = []
+    cell_snapshots: list[list[dict[str, Any]]] = []
 
     for i, t in enumerate(sol.t):
         y = sol.y[:, i]
@@ -137,6 +141,8 @@ def run_simulation(
             series.setdefault(k, []).append(float(v))
         if hasattr(system, "zone_snapshot_segments"):
             zone_snapshots.append(system.zone_snapshot_segments(y))  # type: ignore[attr-defined]
+        if hasattr(system, "cell_snapshot") and config.oned.export_cells_in_snapshot:
+            cell_snapshots.append(system.cell_snapshot(y))  # type: ignore[attr-defined]
         if not ledger.trusted:
             energy_trusted = False
 
@@ -158,8 +164,10 @@ def run_simulation(
     }
     if zone_snapshots:
         meta["zone_snapshot_count"] = len(zone_snapshots)
-        # Store compact final-frame zone snapshot in metadata for exporters
         meta["final_zone_segments"] = zone_snapshots[-1]
+    if cell_snapshots:
+        meta["final_cells"] = cell_snapshots[-1]
+        meta["n_cells"] = len(cell_snapshots[-1])
 
     return SimulationResult(
         run_id=run_id,

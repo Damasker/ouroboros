@@ -15,7 +15,7 @@ from ouroboros.domain.config import SimulationConfig
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_SCHEMA_VERSION = "1.0.0"
+SNAPSHOT_SCHEMA_VERSION = "1.1.0"
 RESULT_FORMAT_VERSION = "1.0.0"
 
 
@@ -155,9 +155,10 @@ def build_snapshot_frame(
     sample: dict[str, float],
     components_status: dict[str, str],
     segments: list[dict[str, Any]] | None = None,
+    cells: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Versioned snapshot for external 3D clients."""
-    return {
+    """Versioned snapshot for external 3D clients (v1.1.0 adds optional cells)."""
+    frame: dict[str, Any] = {
         "snapshot_schema_version": SNAPSHOT_SCHEMA_VERSION,
         "time": time_s,
         "segments": segments if segments is not None else _segments_from_sample(sample),
@@ -176,20 +177,43 @@ def build_snapshot_frame(
             },
         ],
     }
+    if cells is not None:
+        frame["cells"] = cells
+    return frame
 
 
 def export_snapshots_jsonl(result: SimulationResult, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     final_segs = result.metadata.get("final_zone_segments")
+    final_cells = result.metadata.get("final_cells")
     with path.open("w", encoding="utf-8") as f:
         for i, t in enumerate(result.times_s):
             sample = {k: result.series[k][i] for k in result.series}
-            # Prefer series-derived segments; fall back to final metadata frame shape
             segs = _segments_from_sample(sample)
             if len(segs) <= 4 and final_segs and i == len(result.times_s) - 1:
                 segs = final_segs
-            frame = build_snapshot_frame(t, sample, {}, segments=segs)
+            cells = None
+            cell_keys = [k for k in sample if k.startswith("cell_density:")]
+            if cell_keys:
+                cells = []
+                for k in sorted(cell_keys):
+                    parts = k.split(":")
+                    zid, loc = parts[1], parts[2]
+                    flow_key = "flow_a" if "a" in zid else ("flow_b" if "b" in zid else "flow_a")
+                    cells.append(
+                        {
+                            "segment_id": zid,
+                            "local_index": int(loc),
+                            "density": sample[k],
+                            "temperature": sample.get(f"zone_temp_ev:{zid}", 0.0),
+                            "flow_velocity": sample.get(flow_key, 0.0),
+                        }
+                    )
+            # Prefer full mesh cell dump on the final frame when available
+            if final_cells and i == len(result.times_s) - 1:
+                cells = final_cells
+            frame = build_snapshot_frame(t, sample, {}, segments=segs, cells=cells)
             f.write(json.dumps(frame) + "\n")
 
 

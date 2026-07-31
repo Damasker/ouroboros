@@ -1,0 +1,49 @@
+simulation:
+  duration_s: 0.25
+  output_interval_s: 0.01
+  scenario: oned-driven
+  model: oned
+  integrator:
+    method: LSODA
+    rtol: 1.0e-6
+    atol: 1.0e-9
+    max_step_s: 2.0e-3
+geometry:
+  chamber_volume_m3: 1.0
+  branch_a_volume_m3: 0.4
+  branch_b_volume_m3: 0.4
+  return_channel_volume_m3: 0.3
+  expansion_volume_m3: 0.2
+plasma:
+  initial_density_m3: 1.0e19
+  initial_ion_temperature_ev: 200.0
+  initial_electron_temperature_ev: 200.0
+  initial_flow_a_m_s: 40.0
+  initial_flow_b_m_s: 35.0
+  effective_inertia_kg: 1.0e-4
+  friction_coeff_kg_s: 2.0e-4
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: true
+  transport: true
+  wall: true
+  exhaust: true
+  magnetic: true
+  recovery_fraction: 0.1
+  wall_loss_coeff_s: 0.5
+  exhaust_loss_coeff_s: 0.1
+drive:
+  external_heater_w: 5.0e4
+  drive_force_a_n: 2.0e-2
+  drive_force_b_n: 1.8e-2
+controller:
+  type: none
+energy:
+  relative_tolerance: 5.0e-3
+oned:
+  cells_per_segment: 3
+  export_cells_in_snapshot: true
+numerics:
+  max_nfev: 80000
+faults: {}

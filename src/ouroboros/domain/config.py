@@ -23,7 +23,7 @@ class SimulationSection(BaseModel):
     seed: int = 0
     strict_energy: bool = False
     scenario: str = "passive"
-    model: Literal["lumped", "multizone"] = "lumped"
+    model: Literal["lumped", "multizone", "oned"] = "lumped"
 
 
 class GeometrySection(BaseModel):
@@ -130,6 +130,14 @@ class MultiZoneSection(BaseModel):
     geometry_file: str | None = "geometry/loop_geometry.json"
 
 
+class OneDSection(BaseModel):
+    """Options for simulation.model == oned (Milestone 7)."""
+
+    geometry_file: str | None = "geometry/loop_geometry.json"
+    cells_per_segment: int = 4
+    export_cells_in_snapshot: bool = True
+
+
 class SimulationConfig(BaseModel):
     simulation: SimulationSection = Field(default_factory=SimulationSection)
     geometry: GeometrySection = Field(default_factory=GeometrySection)
@@ -144,3 +152,4 @@ class SimulationConfig(BaseModel):
     drive: DriveSection = Field(default_factory=DriveSection)
     faults: FaultSection = Field(default_factory=FaultSection)
     multizone: MultiZoneSection = Field(default_factory=MultiZoneSection)
+    oned: OneDSection = Field(default_factory=OneDSection)

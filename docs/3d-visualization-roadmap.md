@@ -6,11 +6,12 @@ Attach full 3D visualization **without modifying Simulation Core**.
 
 ## Contract
 
-The core already emits versioned JSONL snapshots (`snapshot_schema_version`) with:
+The core already emits versioned JSONL snapshots (`snapshot_schema_version`, currently **1.1.0**) with:
 
 - `time`
 - `segments[]` — density, temperature, flow_velocity, magnetic_field, …
 - `components[]` — throttle currents, stored energy, status
+- optional `cells[]` — per-cell fields for `oned` model (segment averages remain in `segments`)
 - optional `events[]`
 
 Geometry is defined separately in `geometry/loop_geometry.json` (nodes, segments, radii, orientations, element types).

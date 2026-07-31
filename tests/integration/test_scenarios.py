@@ -43,7 +43,7 @@ def test_scenario_runs(config_path: str, tmp_path: Path):
     assert "ledger" in energy
     line = (out / "snapshots.jsonl").read_text(encoding="utf-8").splitlines()[0]
     frame = json.loads(line)
-    assert frame["snapshot_schema_version"] == "1.0.0"
+    assert frame["snapshot_schema_version"].startswith("1.")
     assert "segments" in frame
 
 
