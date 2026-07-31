@@ -32,6 +32,7 @@ SCENARIO_CONFIGS = {
     "oned-momentum-flux": "configs/oned_momentum_flux.yaml",
     "oned-rusanov": "configs/oned_rusanov.yaml",
     "oned-hllc": "configs/oned_hllc.yaml",
+    "oned-energy-flux": "configs/oned_energy_flux.yaml",
     "magnetic-nozzle": "configs/magnetic_nozzle.yaml",
     "reduced-mhd": "configs/reduced_mhd.yaml",
     "fault-block-a": "configs/faults/block_branch_a.yaml",

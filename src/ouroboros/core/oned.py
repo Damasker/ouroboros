@@ -499,6 +499,7 @@ class OneDSystem:
                 CellPressureForces,
                 cell_grad_p_forces,
                 hllc_momentum_flux,
+                rusanov_energy_flux,
                 rusanov_momentum_flux,
                 upwind_momentum_flux,
             )
@@ -567,7 +568,21 @@ class OneDSystem:
                     enabled=cfg.oned.momentum_flux,
                 )
 
-            if use_riemann:
+            if use_riemann and cfg.oned.riemann_energy:
+                eflux = rusanov_energy_flux(
+                    mesh,
+                    masses_kg=masses,
+                    velocities_m_s=vs,
+                    pressures_pa=cell_pressures,
+                    internal_energy_j=[float(Us[i]) for i in range(L.n_cells)],
+                    face_area_factors=face_factors,
+                    pressure_scale=cfg.oned.pressure_force_scale,
+                    dv_dt=mflux.dv_dt,
+                    enabled=True,
+                )
+                for i in range(L.n_cells):
+                    dydt[L.idx_u(i)] += eflux.du_dt[i]
+            elif use_riemann:
                 if cfg.oned.thermalize_momentum_flux and mflux.numerical_heating_w != 0.0:
                     vols = [c.volume_m3 for c in mesh.cells]
                     vtot = max(sum(vols), 1e-30)
@@ -756,6 +771,7 @@ class OneDSystem:
                 "momentum_mode": cfg.oned.momentum_mode,
                 "momentum_flux_heating_w": momentum_flux_heating,
                 "riemann": cfg.oned.riemann,
+                "riemann_energy": cfg.oned.riemann_energy,
                 "thrust_n": nz.thrust_n,
                 "isp_s": nz.isp_s,
                 "jet_power_w": nz.jet_power_w,

@@ -166,6 +166,8 @@ class OneDSection(BaseModel):
     thermalize_momentum_flux: bool = True
     # Milestone 15/16: none | rusanov | hllc (replaces cell_grad_p + upwind when set)
     riemann: Literal["none", "rusanov", "hllc"] = "none"
+    # Milestone 17: Rusanov total-energy flux (requires riemann != none)
+    riemann_energy: bool = False
 
 
 class BlanketSection(BaseModel):

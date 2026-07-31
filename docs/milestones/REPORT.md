@@ -151,3 +151,13 @@ Implemented: `hllc_momentum_flux` with Toro-style \(S_L,S_R,S_M\) on \(F=\rho v^
 Verified: heating identity \(P_U=-\sum m v\dot v\); short 1D run energy-trusted.
 
 Known issues: momentum-only HLLC (no total-energy Riemann); sound speed \(\sqrt{\kappa p/\rho}\) without \(\gamma\); phenomenological cell masses; not MHD HLLD.
+
+## Milestone 17 — Riemann total-energy flux
+
+**Status:** complete
+
+Implemented: `rusanov_energy_flux` for \(E=U/V+\tfrac12\rho v^2\); `oned.riemann_energy` applies \(\dot U=\dot E_{\mathrm{flux}}-m v\dot v\) and skips volume-weighted momentum thermalize; demo `oned_energy_flux` (HLLC + energy).
+
+Verified: closed-mesh identity \(\sum\dot U+\sum m v\dot v=0\); short 1D run energy-trusted.
+
+Known issues: energy flux is Rusanov only (not HLLC star energy); mass \(N\) still uses legacy face transport; not Roe/MHD.

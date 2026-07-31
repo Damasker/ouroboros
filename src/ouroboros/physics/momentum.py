@@ -305,3 +305,76 @@ def hllc_momentum_flux(
     dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
     p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
     return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)
+
+
+@dataclass(frozen=True)
+class EnergyFluxResult:
+    """Per-cell internal-energy rate from Riemann total-energy flux (Milestone 17)."""
+
+    du_dt: tuple[float, ...]  # W into cell U
+    # Identity check: sum(du_dt) + sum(m v dv) ≈ 0 on a closed mesh
+
+
+def rusanov_energy_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    internal_energy_j: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    dv_dt: tuple[float, ...] | list[float],
+    enabled: bool,
+) -> EnergyFluxResult:
+    """
+    Rusanov flux for total energy density E = U/V + ½ρv².
+
+    Φ_E/A = ½(F_L+F_R) − ½ S (E_R−E_L),  F = v(E+κp),
+    S = max(|v|+c), c ≈ √(κp/ρ).
+
+    Cell internal update: ẊU_i = −(Φ_out−Φ_in) − m_i v_i ẋv_i so that
+    total (U+KE) follows the energy flux divergence.
+
+    Classification: simplified Euler LLF / phenomenological — not full HLLC energy.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return EnergyFluxResult(zeros)
+
+    kappa = pressure_scale
+    d_e = [0.0] * n
+    e_dens = [0.0] * n
+    for i in range(n):
+        vol = max(mesh.cells[i].volume_m3, 1e-30)
+        rho = max(masses_kg[i] / vol, 1e-30)
+        e_dens[i] = internal_energy_j[i] / vol + 0.5 * rho * velocities_m_s[i] ** 2
+
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        e_l = e_dens[li]
+        e_r = e_dens[ri]
+        c_l = (max(p_l / rho_l, 0.0)) ** 0.5
+        c_r = (max(p_r / rho_r, 0.0)) ** 0.5
+        s_max = max(abs(v_l) + c_l, abs(v_r) + c_r, 1e-12)
+        f_l = v_l * (e_l + p_l)
+        f_r = v_r * (e_r + p_r)
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * (0.5 * (f_l + f_r) - 0.5 * s_max * (e_r - e_l))
+        d_e[li] -= phi
+        d_e[ri] += phi
+
+    du = [
+        d_e[i] - masses_kg[i] * velocities_m_s[i] * float(dv_dt[i])
+        for i in range(n)
+    ]
+    return EnergyFluxResult(du_dt=tuple(du))

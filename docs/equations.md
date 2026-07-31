@@ -197,6 +197,18 @@ S_M=\frac{\rho_R v_R(S_R-v_R)-\rho_L v_L(S_L-v_L)+p_L-p_R}
 
 Star momenta \(\rho^* S_M\) feed the usual HLLC piecewise flux; \(\nabla p\) / upwind are disabled. Energy: \(\dot U_{\mathrm{tot}}=-\sum m_i v_i\dot v_i^{\mathrm{HLLC}}\). Classification: simplified HLLC on phenomenological masses — not full Euler/MHD HLLC.
 
+## 4j. Total-energy flux (Milestone 17)
+
+With `oned.riemann_energy: true` (requires `riemann` ≠ `none`):
+
+\[
+E=\frac{U}{V}+\tfrac12\rho v^2,\qquad
+\frac{\Phi_E}{A}=\tfrac12(F_L+F_R)-\tfrac12 S(E_R-E_L),\qquad
+F=v(E+\kappa p).
+\]
+
+Cell update: \(\dot U_i=\dot E_i^{\mathrm{flux}}-m_i v_i\dot v_i^{\mathrm{mom}}\). Volume-weighted momentum thermalize is skipped. Classification: simplified Euler LLF energy — not HLLC/Roe star energy.
+
 ## 5. D–T fusion
 
 \[

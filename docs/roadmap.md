@@ -109,9 +109,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Same kin↔int exchange / double-count avoidance as Rusanov
 - Config `oned_hllc`
 
+## Milestone 17 — Riemann total-energy flux
+
+- `oned.riemann_energy` — Rusanov LLF on \(F_E=v(E+\kappa p)\), \(E=U/V+\tfrac12\rho v^2\)
+- \(\dot U_i=\dot E_i^{\mathrm{flux}}-m_i v_i\dot v_i\) replaces volume-weighted thermalize
+- Config `oned_energy_flux` (HLLC momentum + energy flux)
+
 ## Beyond
 
-- Full Euler energy equation / Roe / wave MHD
+- HLLC star energy / Roe / wave MHD
 - Particle / Monte Carlo neutrons
 - Game-engine (Godot/Unity) / WebGPU volumetric client
 - Higher-fidelity nozzle / spacecraft trajectory coupling
