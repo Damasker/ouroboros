@@ -1,0 +1,72 @@
+# Magnetic nozzle + spacecraft Δv trajectory (Milestone 22)
+simulation:
+  duration_s: 0.25
+  output_interval_s: 0.01
+  scenario: nozzle-trajectory
+  model: multizone
+  integrator:
+    method: LSODA
+    rtol: 1.0e-6
+    atol: 1.0e-9
+    max_step_s: 2.0e-3
+geometry:
+  chamber_volume_m3: 1.0
+  branch_a_volume_m3: 0.4
+  branch_b_volume_m3: 0.4
+  return_channel_volume_m3: 0.3
+  expansion_volume_m3: 0.25
+  branch_cross_section_m2: 0.05
+plasma:
+  initial_density_m3: 1.0e19
+  initial_ion_temperature_ev: 150.0
+  initial_electron_temperature_ev: 150.0
+  initial_flow_a_m_s: 40.0
+  initial_flow_b_m_s: 36.0
+  effective_inertia_kg: 1.0e-4
+  friction_coeff_kg_s: 2.0e-4
+  confinement_time_s: 0.2
+throttle_a:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  coupling_mode: none
+throttle_b:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  coupling_mode: none
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: true
+drive:
+  external_heater_w: 5.0e4
+  drive_force_a_n: 5.0e-3
+  drive_force_b_n: 4.0e-3
+  fueling_rate_s: 5.0e17
+controller:
+  type: none
+energy:
+  relative_tolerance: 1.0e-3
+  absolute_floor_j: 1.0e-6
+nozzle:
+  enabled: true
+  zone_id: expansion
+  extract_fraction: 0.08
+  extract_time_s: 0.15
+  magnetic_efficiency: 0.65
+  expansion_ratio: 8.0
+  gamma: 1.6666666667
+  thermal_velocity_blend: 0.35
+spacecraft:
+  enabled: true
+  dry_mass_kg: 500.0
+  wet_mass_kg: 800.0
+  include_thrust_accel: true
+multizone:
+  geometry_file: geometry/loop_geometry.json
+numerics:
+  max_nfev: 80000
+faults: {}

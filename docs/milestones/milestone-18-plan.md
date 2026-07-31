@@ -23,5 +23,3 @@ Simplified HLLC energy on phenomenological cell masses — not production Euler/
 - Auto-select in `core/oned.py` when `riemann: hllc` + `riemann_energy`
 - Config `oned_hllc_energy` / scenario `oned-hllc-energy`
 - Integration tests + equations / roadmap / REPORT updates
-
-Also update M17 REPORT note that energy can be HLLC when riemann=hllc.

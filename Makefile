@@ -65,6 +65,10 @@ demo: setup
 	$(MAKE) run-scenario SCENARIO=oned-hllc
 	$(MAKE) run-scenario SCENARIO=oned-energy-flux
 	$(MAKE) run-scenario SCENARIO=oned-hllc-energy
+	$(MAKE) run-scenario SCENARIO=oned-roe
+	$(MAKE) run-scenario SCENARIO=oned-wave-mhd
+	$(MAKE) run-scenario SCENARIO=dt-blanket-mc
+	$(MAKE) run-scenario SCENARIO=nozzle-trajectory
 
 geometry:
 	$(PYTHON) -c "from ouroboros.geometry import default_loop_geometry; default_loop_geometry().save('geometry/loop_geometry.json')"

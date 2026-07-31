@@ -450,28 +450,34 @@ class OneDSystem:
         if cfg.nozzle.enabled and exp_idxs:
             n_exp = float(sum(Ns[i] for i in exp_idxs))
             u_exp = float(sum(Us[i] for i in exp_idxs))
+            from ouroboros.physics.nozzle_config import nozzle_kwargs
+
+            t_exp = float(sum(temps[i] for i in exp_idxs) / len(exp_idxs))
             nz = magnetic_nozzle_powers(
-                n_particles=n_exp,
-                internal_energy_j=u_exp,
-                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
-                extract_time_s=cfg.nozzle.extract_time_s,
-                extract_fraction=cfg.nozzle.extract_fraction,
-                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
-                enabled=True,
+                **nozzle_kwargs(
+                    cfg.nozzle,
+                    n_particles=n_exp,
+                    internal_energy_j=u_exp,
+                    mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                    enabled=True,
+                    ion_temperature_k=t_exp,
+                )
             )
             share_n = 1.0 / len(exp_idxs)
             for ci in exp_idxs:
                 dydt[L.idx_n(ci)] -= share_n * nz.particle_rate_s
                 dydt[L.idx_u(ci)] -= share_n * nz.thermal_extract_w
         else:
+            from ouroboros.physics.nozzle_config import nozzle_kwargs
+
             nz = magnetic_nozzle_powers(
-                n_particles=0.0,
-                internal_energy_j=0.0,
-                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
-                extract_time_s=cfg.nozzle.extract_time_s,
-                extract_fraction=cfg.nozzle.extract_fraction,
-                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
-                enabled=False,
+                **nozzle_kwargs(
+                    cfg.nozzle,
+                    n_particles=0.0,
+                    internal_energy_j=0.0,
+                    mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                    enabled=False,
+                )
             )
 
         # Momentum / throttles
@@ -500,14 +506,28 @@ class OneDSystem:
                 cell_grad_p_forces,
                 hllc_energy_flux,
                 hllc_momentum_flux,
+                roe_energy_flux,
+                roe_momentum_flux,
                 rusanov_energy_flux,
                 rusanov_momentum_flux,
                 upwind_momentum_flux,
             )
+            from ouroboros.physics.reduced_mhd import MU0
 
             masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
             vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
-            use_riemann = cfg.oned.riemann in ("rusanov", "hllc")
+            use_riemann = cfg.oned.riemann in ("rusanov", "hllc", "roe")
+
+            # Wave-MHD: add B²/2μ₀ into effective pressure seen by Riemann
+            riemann_pressures = list(cell_pressures)
+            if use_riemann and cfg.oned.wave_mhd:
+                turns = 0.5 * (
+                    cfg.throttle_a.coil_turns_per_metre + cfg.throttle_b.coil_turns_per_metre
+                )
+                b = MU0 * turns * 0.5 * (abs(i_a) + abs(i_b))
+                p_mag = cfg.oned.wave_mhd_scale * (b * b) / (2.0 * MU0)
+                kappa = max(cfg.oned.pressure_force_scale, 1e-30)
+                riemann_pressures = [p + p_mag / kappa for p in cell_pressures]
 
             if use_riemann:
                 gpf = CellPressureForces(
@@ -540,26 +560,21 @@ class OneDSystem:
                 face_factors.append(fac)
                 face_speeds.append(u * fac)
 
+            m_kwargs = dict(
+                mesh=mesh,
+                masses_kg=masses,
+                velocities_m_s=vs,
+                pressures_pa=riemann_pressures,
+                face_area_factors=face_factors,
+                pressure_scale=cfg.oned.pressure_force_scale,
+                enabled=True,
+            )
             if cfg.oned.riemann == "hllc":
-                mflux = hllc_momentum_flux(
-                    mesh,
-                    masses_kg=masses,
-                    velocities_m_s=vs,
-                    pressures_pa=cell_pressures,
-                    face_area_factors=face_factors,
-                    pressure_scale=cfg.oned.pressure_force_scale,
-                    enabled=True,
-                )
+                mflux = hllc_momentum_flux(**m_kwargs)
+            elif cfg.oned.riemann == "roe":
+                mflux = roe_momentum_flux(**m_kwargs)
             elif cfg.oned.riemann == "rusanov":
-                mflux = rusanov_momentum_flux(
-                    mesh,
-                    masses_kg=masses,
-                    velocities_m_s=vs,
-                    pressures_pa=cell_pressures,
-                    face_area_factors=face_factors,
-                    pressure_scale=cfg.oned.pressure_force_scale,
-                    enabled=True,
-                )
+                mflux = rusanov_momentum_flux(**m_kwargs)
             else:
                 mflux = upwind_momentum_flux(
                     mesh,
@@ -574,7 +589,7 @@ class OneDSystem:
                     mesh=mesh,
                     masses_kg=masses,
                     velocities_m_s=vs,
-                    pressures_pa=cell_pressures,
+                    pressures_pa=riemann_pressures,
                     internal_energy_j=[float(Us[i]) for i in range(L.n_cells)],
                     face_area_factors=face_factors,
                     pressure_scale=cfg.oned.pressure_force_scale,
@@ -583,6 +598,8 @@ class OneDSystem:
                 )
                 if cfg.oned.riemann == "hllc":
                     eflux = hllc_energy_flux(**e_kwargs)
+                elif cfg.oned.riemann == "roe":
+                    eflux = roe_energy_flux(**e_kwargs)
                 else:
                     eflux = rusanov_energy_flux(**e_kwargs)
                 for i in range(L.n_cells):
@@ -777,6 +794,7 @@ class OneDSystem:
                 "momentum_flux_heating_w": momentum_flux_heating,
                 "riemann": cfg.oned.riemann,
                 "riemann_energy": cfg.oned.riemann_energy,
+                "wave_mhd": cfg.oned.wave_mhd,
                 "thrust_n": nz.thrust_n,
                 "isp_s": nz.isp_s,
                 "jet_power_w": nz.jet_power_w,

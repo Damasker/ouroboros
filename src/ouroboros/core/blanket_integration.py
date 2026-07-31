@@ -5,6 +5,17 @@ from __future__ import annotations
 from ouroboros.domain import EnergyLedger
 from ouroboros.domain.config import SimulationConfig
 from ouroboros.physics.blanket import BlanketPowers, blanket_rhs
+from ouroboros.physics.neutron_mc import mc_neutron_capture_fraction
+
+
+def _capture_fraction(cfg: SimulationConfig) -> float:
+    if cfg.blanket.transport == "mc":
+        return mc_neutron_capture_fraction(
+            optical_depth=cfg.blanket.mc_optical_depth,
+            n_particles=cfg.blanket.mc_particles,
+            seed=cfg.blanket.mc_seed,
+        ).capture_fraction
+    return cfg.blanket.capture_fraction
 
 
 def apply_blanket_ode(
@@ -22,7 +33,7 @@ def apply_blanket_ode(
     dE, _dT, powers = blanket_rhs(
         neutron_power_w=neutron_power_w,
         thermal_energy_j=e_blanket_j,
-        capture_fraction=cfg.blanket.capture_fraction,
+        capture_fraction=_capture_fraction(cfg),
         coolant_time_s=cfg.blanket.coolant_time_s,
         breeding_ratio=cfg.blanket.breeding_ratio,
         enabled=cfg.blanket.enabled,

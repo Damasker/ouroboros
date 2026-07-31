@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ouroboros WebGPU Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #dfe8e4; --bg1: #f2f0e8; --ink: #18241f; --muted: #5a655e;
+      --line: #24352e; --accent: #b85a28; --cool: #1f6f6a; --panel: rgba(255,252,245,0.94);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background:
+        radial-gradient(ellipse 70% 45% at 15% 10%, #c9ddd6 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 90% 90%, #e5d2c0 0%, transparent 50%),
+        linear-gradient(160deg, var(--bg1), var(--bg0));
+      color: var(--ink);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    .shell { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
+    header { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: baseline; margin-bottom: 1rem; }
+    h1 { font-family: Syne, sans-serif; font-size: clamp(1.6rem, 4vw, 2.4rem); margin: 0; }
+    .tag { color: var(--muted); font-size: 0.8rem; }
+    a { color: var(--cool); }
+    .controls {
+      display: grid; gap: 0.75rem; grid-template-columns: 1fr;
+      background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 18%, transparent);
+      padding: 0.85rem 1rem; margin-bottom: 1rem;
+    }
+    @media (min-width: 720px) { .controls { grid-template-columns: 2fr 1fr auto auto; align-items: end; } }
+    label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    select, button { font: inherit; }
+    select { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid color-mix(in srgb, var(--line) 25%, transparent); background: #fff; color: var(--ink); }
+    button { font-weight: 600; border: 1px solid var(--line); background: var(--ink); color: var(--bg1); padding: 0.55rem 1rem; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--ink); }
+    .stage { position: relative; background: #0f1614; border: 1px solid color-mix(in srgb, var(--line) 30%, transparent); overflow: hidden; }
+    canvas { display: block; width: 100%; height: auto; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; margin-top: 0.85rem; font-size: 0.8rem; color: var(--muted); }
+    .meta strong { color: var(--ink); }
+    .err { color: #8b1e1e; margin-top: 0.5rem; font-size: 0.85rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Ouroboros</h1>
+      <span class="tag">WebGPU volumetric loop · <a href="/viewer">canvas viewer</a></span>
+    </header>
+    <div class="controls">
+      <div>
+        <label for="run">Run</label>
+        <select id="run"></select>
+      </div>
+      <div>
+        <label for="field">Field</label>
+        <select id="field">
+          <option value="density">density</option>
+          <option value="temperature">temperature</option>
+          <option value="flow_velocity">flow velocity</option>
+        </select>
+      </div>
+      <button id="reload" type="button" class="secondary">Reload</button>
+      <button id="play" type="button">Play</button>
+    </div>
+    <div>
+      <label for="frame">Frame <span id="frameLabel">0</span></label>
+      <input id="frame" type="range" min="0" max="0" value="0" style="width:100%" />
+    </div>
+    <div class="stage">
+      <canvas id="c" width="1000" height="560"></canvas>
+    </div>
+    <div class="meta">
+      <div>backend = <strong id="backend">—</strong></div>
+      <div>t = <strong id="tVal">—</strong> s</div>
+      <div>segments = <strong id="nSeg">—</strong></div>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+  <script type="module">
+    const $ = (id) => document.getElementById(id);
+    const state = { frames: [], playing: false, raf: 0, lastTs: 0, gpu: null };
+
+    const LAYOUT = {
+      branch_a: [[0.18, 0.28], [0.42, 0.18], [0.62, 0.22], [0.78, 0.35]],
+      reaction_chamber: [[0.78, 0.35], [0.84, 0.50], [0.78, 0.65]],
+      branch_b: [[0.78, 0.65], [0.62, 0.78], [0.42, 0.82], [0.18, 0.72]],
+      return_channel: [[0.18, 0.72], [0.12, 0.50], [0.18, 0.28]],
+      expansion_nozzle: [[0.84, 0.50], [0.94, 0.50]],
+    };
+
+    async function fetchJSON(url) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url} → ${r.status}`);
+      return r.json();
+    }
+
+    function fieldRange(frames, field) {
+      let lo = Infinity, hi = -Infinity;
+      for (const f of frames) {
+        for (const s of f.segments || []) {
+          const v = Number(s[field]);
+          if (!Number.isFinite(v)) continue;
+          lo = Math.min(lo, v); hi = Math.max(hi, v);
+        }
+      }
+      if (!Number.isFinite(lo)) return [0, 1];
+      if (hi <= lo) hi = lo + 1;
+      return [lo, hi];
+    }
+
+    function buildVolumeTextureData(frame, field, lo, hi) {
+      // Pack a 64×64 R8 luminance "volume slice" from loop polylines (volumetric proxy)
+      const W = 64, H = 64;
+      const data = new Uint8Array(W * H);
+      const segs = Object.fromEntries((frame?.segments || []).map(s => [s.id, s]));
+      for (const [id, pts] of Object.entries(LAYOUT)) {
+        const s = segs[id];
+        let t = 0.35;
+        if (s && Number.isFinite(Number(s[field]))) t = (Number(s[field]) - lo) / (hi - lo);
+        t = Math.min(1, Math.max(0, t));
+        const val = Math.round(40 + t * 215);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const x0 = pts[i][0] * (W - 1), y0 = pts[i][1] * (H - 1);
+          const x1 = pts[i + 1][0] * (W - 1), y1 = pts[i + 1][1] * (H - 1);
+          const steps = 48;
+          for (let k = 0; k <= steps; k++) {
+            const u = k / steps;
+            const x = Math.round(x0 + (x1 - x0) * u);
+            const y = Math.round(y0 + (y1 - y0) * u);
+            for (let dy = -2; dy <= 2; dy++) {
+              for (let dx = -2; dx <= 2; dx++) {
+                const xx = x + dx, yy = y + dy;
+                if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+                const idx = yy * W + xx;
+                data[idx] = Math.max(data[idx], val);
+              }
+            }
+          }
+        }
+      }
+      return { data, W, H };
+    }
+
+    async function initGPU() {
+      if (!navigator.gpu) return null;
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) return null;
+      const device = await adapter.requestDevice();
+      const canvas = $("c");
+      const context = canvas.getContext("webgpu");
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      context.configure({ device, format, alphaMode: "opaque" });
+
+      const shader = device.createShaderModule({
+        code: `
+struct Uniforms { time: f32, _pad: vec3f }
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var samp: sampler;
+@group(0) @binding(2) var tex: texture_2d<f32>;
+
+struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }
+
+@vertex fn vs(@builtin(vertex_index) vi: u32) -> VSOut {
+  var p = array<vec2f, 6>(
+    vec2f(-1,-1), vec2f(1,-1), vec2f(-1,1),
+    vec2f(-1,1), vec2f(1,-1), vec2f(1,1)
+  );
+  var o: VSOut;
+  o.pos = vec4f(p[vi], 0.0, 1.0);
+  o.uv = p[vi] * 0.5 + 0.5;
+  o.uv.y = 1.0 - o.uv.y;
+  return o;
+}
+
+@fragment fn fs(i: VSOut) -> @location(0) vec4f {
+  let v = textureSample(tex, samp, i.uv).r;
+  let pulse = 0.85 + 0.15 * sin(u.time * 3.0 + i.uv.x * 8.0);
+  let cool = vec3f(0.12, 0.40, 0.38);
+  let warm = vec3f(0.77, 0.36, 0.15);
+  let mid = vec3f(0.85, 0.76, 0.58);
+  let t = clamp(v * pulse, 0.0, 1.0);
+  var col = mix(cool, mid, smoothstep(0.0, 0.55, t));
+  col = mix(col, warm, smoothstep(0.45, 1.0, t));
+  let bg = vec3f(0.06, 0.09, 0.08);
+  col = mix(bg, col, smoothstep(0.02, 0.2, v));
+  return vec4f(col, 1.0);
+}
+`
+      });
+
+      const pipeline = device.createRenderPipeline({
+        layout: "auto",
+        vertex: { module: shader, entryPoint: "vs" },
+        fragment: { module: shader, entryPoint: "fs", targets: [{ format }] },
+        primitive: { topology: "triangle-list" },
+      });
+
+      const uniformBuffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+      const texture = device.createTexture({
+        size: [64, 64],
+        format: "r8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: uniformBuffer } },
+          { binding: 1, resource: sampler },
+          { binding: 2, resource: texture.createView() },
+        ],
+      });
+
+      return { device, context, pipeline, uniformBuffer, texture, bindGroup, t0: performance.now() };
+    }
+
+    function drawCanvasFallback(idx) {
+      const canvas = $("c");
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = "#0f1614";
+      ctx.fillRect(0, 0, w, h);
+      const frame = state.frames[idx];
+      if (!frame) return;
+      const field = $("field").value;
+      const [lo, hi] = fieldRange(state.frames, field);
+      const segs = Object.fromEntries((frame.segments || []).map(s => [s.id, s]));
+      for (const [id, pts] of Object.entries(LAYOUT)) {
+        const s = segs[id];
+        let t = 0.3;
+        if (s && Number.isFinite(Number(s[field]))) t = (Number(s[field]) - lo) / (hi - lo);
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0] * w, pts[0][1] * h);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * w, pts[i][1] * h);
+        ctx.strokeStyle = `rgb(${Math.round(30+t*180)},${Math.round(100-t*40)},${Math.round(90-t*50)})`;
+        ctx.lineWidth = 16;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+      $("backend").textContent = "canvas2d fallback";
+      $("tVal").textContent = Number(frame.time).toFixed(4);
+      $("nSeg").textContent = String((frame.segments || []).length);
+      $("frameLabel").textContent = String(idx);
+    }
+
+    function drawGPU(idx) {
+      const g = state.gpu;
+      const frame = state.frames[idx];
+      if (!g || !frame) return;
+      const field = $("field").value;
+      const [lo, hi] = fieldRange(state.frames, field);
+      const { data, W, H } = buildVolumeTextureData(frame, field, lo, hi);
+      g.device.queue.writeTexture(
+        { texture: g.texture },
+        data,
+        { bytesPerRow: W },
+        { width: W, height: H }
+      );
+      const t = (performance.now() - g.t0) * 0.001;
+      g.device.queue.writeBuffer(g.uniformBuffer, 0, new Float32Array([t, 0, 0, 0]));
+      const encoder = g.device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: g.context.getCurrentTexture().createView(),
+          clearValue: { r: 0.06, g: 0.09, b: 0.08, a: 1 },
+          loadOp: "clear",
+          storeOp: "store",
+        }],
+      });
+      pass.setPipeline(g.pipeline);
+      pass.setBindGroup(0, g.bindGroup);
+      pass.draw(6);
+      pass.end();
+      g.device.queue.submit([encoder.finish()]);
+      $("backend").textContent = "webgpu";
+      $("tVal").textContent = Number(frame.time).toFixed(4);
+      $("nSeg").textContent = String((frame.segments || []).length);
+      $("frameLabel").textContent = String(idx);
+    }
+
+    function draw(idx) {
+      if (state.gpu) drawGPU(idx);
+      else drawCanvasFallback(idx);
+    }
+
+    async function loadRuns() {
+      const data = await fetchJSON("/runs");
+      const sel = $("run");
+      sel.innerHTML = "";
+      for (const run of data.runs || []) {
+        const opt = document.createElement("option");
+        opt.value = run.run_id;
+        opt.textContent = `${run.run_id} (${run.n_snapshots ?? "?"} frames)`;
+        sel.appendChild(opt);
+      }
+      if (!data.runs?.length) $("err").textContent = "No runs with snapshots. Run a scenario first.";
+    }
+
+    async function loadRun(runId) {
+      $("err").textContent = "";
+      const data = await fetchJSON(`/runs/${encodeURIComponent(runId)}/snapshots`);
+      state.frames = data.frames || [];
+      $("frame").max = Math.max(0, state.frames.length - 1);
+      $("frame").value = 0;
+      draw(0);
+    }
+
+    function tick(ts) {
+      if (!state.playing) return;
+      if (ts - state.lastTs > 80) {
+        state.lastTs = ts;
+        let i = Number($("frame").value) + 1;
+        if (i >= state.frames.length) i = 0;
+        $("frame").value = i;
+        draw(i);
+      }
+      state.raf = requestAnimationFrame(tick);
+    }
+
+    $("play").onclick = () => {
+      state.playing = !state.playing;
+      $("play").textContent = state.playing ? "Pause" : "Play";
+      if (state.playing) state.raf = requestAnimationFrame(tick);
+      else cancelAnimationFrame(state.raf);
+    };
+    $("frame").oninput = () => draw(Number($("frame").value));
+    $("field").onchange = () => draw(Number($("frame").value));
+    $("run").onchange = () => loadRun($("run").value);
+    $("reload").onclick = async () => {
+      await loadRuns();
+      if ($("run").value) await loadRun($("run").value);
+    };
+
+    (async () => {
+      try {
+        state.gpu = await initGPU();
+        if (!state.gpu) $("err").textContent = "WebGPU unavailable — using canvas fallback.";
+        await loadRuns();
+        if ($("run").value) await loadRun($("run").value);
+      } catch (e) {
+        $("err").textContent = String(e.message || e);
+        drawCanvasFallback(0);
+      }
+    })();
+  </script>
+</body>
+</html>

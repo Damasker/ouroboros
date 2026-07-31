@@ -150,6 +150,18 @@ def run_simulation(
     for k in SERIES_KEYS:
         series.setdefault(k, [float("nan")] * len(times))
 
+    # Milestone 22: rocket Δv post-process (outside plasma energy ledger)
+    if config.spacecraft.enabled and times:
+        from ouroboros.physics.trajectory import integrate_trajectory_series
+
+        traj = integrate_trajectory_series(
+            times_s=times,
+            thrust_n=series.get("thrust_n", [0.0] * len(times)),
+            mass_flow_kg_s=series.get("nozzle_mass_flow_kg_s", [0.0] * len(times)),
+            spacecraft=config.spacecraft,
+        )
+        series.update(traj)
+
     y_final = sol.y[:, len(times) - 1] if times else y0
     ledger_final = system.ledger_from_state(y_final)
     if not ledger_final.trusted:
@@ -161,6 +173,7 @@ def run_simulation(
         "n_steps": int(getattr(sol, "nfev", nfev_box["n"])),
         "scenario": config.simulation.scenario,
         "model": config.simulation.model,
+        "spacecraft_enabled": config.spacecraft.enabled,
     }
     if zone_snapshots:
         meta["zone_snapshot_count"] = len(zone_snapshots)

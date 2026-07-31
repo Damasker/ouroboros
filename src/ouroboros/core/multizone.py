@@ -377,26 +377,34 @@ class MultiZoneSystem:
         zid = cfg.nozzle.zone_id
         if cfg.nozzle.enabled and zid in net.zone_index:
             zi = net.zone_index[zid]
+            from ouroboros.physics.nozzle_config import nozzle_kwargs
+
+            t_noz = _temperature_from_energy(
+                Ns[zi], Us[zi], net.zones[zi].volume_m3
+            )
             nz = magnetic_nozzle_powers(
-                n_particles=Ns[zi],
-                internal_energy_j=Us[zi],
-                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
-                extract_time_s=cfg.nozzle.extract_time_s,
-                extract_fraction=cfg.nozzle.extract_fraction,
-                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
-                enabled=True,
+                **nozzle_kwargs(
+                    cfg.nozzle,
+                    n_particles=Ns[zi],
+                    internal_energy_j=Us[zi],
+                    mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                    enabled=True,
+                    ion_temperature_k=float(t_noz),
+                )
             )
             dydt[L.idx_n(zi)] -= nz.particle_rate_s
             dydt[L.idx_u(zi)] -= nz.thermal_extract_w
         else:
+            from ouroboros.physics.nozzle_config import nozzle_kwargs
+
             nz = magnetic_nozzle_powers(
-                n_particles=0.0,
-                internal_energy_j=0.0,
-                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
-                extract_time_s=cfg.nozzle.extract_time_s,
-                extract_fraction=cfg.nozzle.extract_fraction,
-                magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
-                enabled=False,
+                **nozzle_kwargs(
+                    cfg.nozzle,
+                    n_particles=0.0,
+                    internal_energy_j=0.0,
+                    mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                    enabled=False,
+                )
             )
 
         # Momentum + throttles (Milestone 8 coupling modes)

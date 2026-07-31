@@ -60,7 +60,13 @@ make run-scenario SCENARIO=oned-rusanov
 make run-scenario SCENARIO=oned-hllc
 make run-scenario SCENARIO=oned-energy-flux
 make run-scenario SCENARIO=oned-hllc-energy
+make run-scenario SCENARIO=oned-roe
+make run-scenario SCENARIO=oned-wave-mhd
+make run-scenario SCENARIO=dt-blanket-mc
+make run-scenario SCENARIO=nozzle-trajectory
 ```
+
+WebGPU volumetric viewer: `http://127.0.0.1:8765/viewer/webgpu.html` (falls back to canvas if WebGPU is unavailable).
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.
 

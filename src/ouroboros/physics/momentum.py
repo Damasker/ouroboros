@@ -477,3 +477,153 @@ def hllc_energy_flux(
         for i in range(n)
     ]
     return EnergyFluxResult(du_dt=tuple(du))
+
+
+def roe_momentum_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    enabled: bool,
+) -> MomentumFluxResult:
+    """
+    Roe approximate Riemann flux for momentum: F = ρv² + κp.
+
+    Roe averages ρ̃=√(ρ_L ρ_R), ṽ weighted by √ρ; c̃=√(κp̃/ρ̃).
+    Two-wave dissipation on [ρ, ρv] (isothermal-like).
+
+    Classification: simplified Roe / phenomenological — not full Euler Roe/MHD.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return MomentumFluxResult(zeros, 0.0)
+
+    kappa = pressure_scale
+    d_mom = [0.0] * n
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        f_l = rho_l * v_l * v_l + p_l
+        f_r = rho_r * v_r * v_r + p_r
+
+        w_l = rho_l**0.5
+        w_r = rho_r**0.5
+        w_sum = w_l + w_r
+        rho_roe = w_l * w_r
+        v_roe = (w_l * v_l + w_r * v_r) / w_sum
+        p_roe = 0.5 * (p_l + p_r)
+        c_roe = (max(p_roe / max(rho_roe, 1e-30), 0.0)) ** 0.5
+        c_roe = max(c_roe, 1e-12)
+
+        d_rho = rho_r - rho_l
+        d_mom_face = rho_r * v_r - rho_l * v_l
+        # α for right eigenvectors r1=[1,v-c], r2=[1,v+c]
+        a1 = ((v_roe + c_roe) * d_rho - d_mom_face) / (2.0 * c_roe)
+        a2 = (-(v_roe - c_roe) * d_rho + d_mom_face) / (2.0 * c_roe)
+        lam1 = abs(v_roe - c_roe)
+        lam2 = abs(v_roe + c_roe)
+        diss = 0.5 * (lam1 * a1 * (v_roe - c_roe) + lam2 * a2 * (v_roe + c_roe))
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * (0.5 * (f_l + f_r) - diss)
+        d_mom[li] -= phi
+        d_mom[ri] += phi
+
+    dv = [d_mom[i] / max(masses_kg[i], 1e-30) for i in range(n)]
+    p_ke = sum(masses_kg[i] * velocities_m_s[i] * dv[i] for i in range(n))
+    return MomentumFluxResult(dv_dt=tuple(dv), numerical_heating_w=-p_ke)
+
+
+def roe_energy_flux(
+    mesh: OneDMesh,
+    *,
+    masses_kg: list[float],
+    velocities_m_s: list[float],
+    pressures_pa: list[float],
+    internal_energy_j: list[float],
+    face_area_factors: list[float],
+    pressure_scale: float,
+    dv_dt: tuple[float, ...] | list[float],
+    enabled: bool,
+) -> EnergyFluxResult:
+    """
+    Roe flux for total energy density E = U/V + ½ρv², F_E = v(E+κp).
+
+    Uses same Roe averages as roe_momentum_flux; dissipates on ΔE with |ṽ|±c̃.
+
+    Classification: simplified Roe energy — not full Euler Roe/entropy fix.
+    """
+    n = mesh.n_cells
+    zeros = tuple(0.0 for _ in range(n))
+    if not enabled or len(face_area_factors) != len(mesh.faces):
+        return EnergyFluxResult(zeros)
+
+    kappa = pressure_scale
+    d_e = [0.0] * n
+    e_dens = [0.0] * n
+    for i in range(n):
+        vol = max(mesh.cells[i].volume_m3, 1e-30)
+        rho = max(masses_kg[i] / vol, 1e-30)
+        e_dens[i] = internal_energy_j[i] / vol + 0.5 * rho * velocities_m_s[i] ** 2
+
+    for face, af in zip(mesh.faces, face_area_factors, strict=True):
+        li, ri = face.left, face.right
+        vol_l = max(mesh.cells[li].volume_m3, 1e-30)
+        vol_r = max(mesh.cells[ri].volume_m3, 1e-30)
+        rho_l = max(masses_kg[li] / vol_l, 1e-30)
+        rho_r = max(masses_kg[ri] / vol_r, 1e-30)
+        v_l = velocities_m_s[li]
+        v_r = velocities_m_s[ri]
+        p_l = kappa * pressures_pa[li]
+        p_r = kappa * pressures_pa[ri]
+        e_l = e_dens[li]
+        e_r = e_dens[ri]
+        f_l = v_l * (e_l + p_l)
+        f_r = v_r * (e_r + p_r)
+
+        w_l = rho_l**0.5
+        w_r = rho_r**0.5
+        w_sum = w_l + w_r
+        rho_roe = w_l * w_r
+        v_roe = (w_l * v_l + w_r * v_r) / w_sum
+        p_roe = 0.5 * (p_l + p_r)
+        c_roe = max((max(p_roe / max(rho_roe, 1e-30), 0.0)) ** 0.5, 1e-12)
+
+        d_rho = rho_r - rho_l
+        d_mom_face = rho_r * v_r - rho_l * v_l
+        d_e_face = e_r - e_l
+        a1 = ((v_roe + c_roe) * d_rho - d_mom_face) / (2.0 * c_roe)
+        a2 = (-(v_roe - c_roe) * d_rho + d_mom_face) / (2.0 * c_roe)
+        # Energy eigenvector weights: approximate with enthalpy-like projection
+        h_l = (e_l + p_l) / rho_l
+        h_r = (e_r + p_r) / rho_r
+        h_roe = (w_l * h_l + w_r * h_r) / w_sum
+        # Dissipate ΔE with acoustic + contact-ish |v| mode residual
+        a_e = d_e_face - a1 * (h_roe - v_roe * c_roe) - a2 * (h_roe + v_roe * c_roe)
+        diss = 0.5 * (
+            abs(v_roe - c_roe) * a1 * (h_roe - v_roe * c_roe)
+            + abs(v_roe + c_roe) * a2 * (h_roe + v_roe * c_roe)
+            + abs(v_roe) * a_e
+        )
+
+        a_eff = face.area_m2 * max(af, 0.0)
+        phi = a_eff * (0.5 * (f_l + f_r) - diss)
+        d_e[li] -= phi
+        d_e[ri] += phi
+
+    du = [
+        d_e[i] - masses_kg[i] * velocities_m_s[i] * float(dv_dt[i])
+        for i in range(n)
+    ]
+    return EnergyFluxResult(du_dt=tuple(du))

@@ -101,6 +101,9 @@ SERIES_KEYS = [
     "isp_s",
     "jet_power_w",
     "nozzle_mass_flow_kg_s",
+    "spacecraft_mass_kg",
+    "delta_v_m_s",
+    "acceleration_m_s2",
 ]
 
 
@@ -471,14 +474,17 @@ class LoopSystem:
         # Magnetic nozzle (lumped: chamber is the extraction proxy)
         from ouroboros.physics.nozzle import magnetic_nozzle_powers
 
+        from ouroboros.physics.nozzle_config import nozzle_kwargs
+
         nz = magnetic_nozzle_powers(
-            n_particles=n_c,
-            internal_energy_j=u_c,
-            mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
-            extract_time_s=cfg.nozzle.extract_time_s,
-            extract_fraction=cfg.nozzle.extract_fraction,
-            magnetic_efficiency=cfg.nozzle.magnetic_efficiency,
-            enabled=cfg.nozzle.enabled,
+            **nozzle_kwargs(
+                cfg.nozzle,
+                n_particles=n_c,
+                internal_energy_j=u_c,
+                mean_particle_mass_kg=cfg.plasma.mean_particle_mass_kg,
+                enabled=cfg.nozzle.enabled,
+                ion_temperature_k=temp_c,
+            )
         )
         dydt[IDX_N_C] -= nz.particle_rate_s
         dydt[IDX_U_C] -= nz.thermal_extract_w

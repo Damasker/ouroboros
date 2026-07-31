@@ -121,9 +121,31 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Rusanov energy retained for `riemann: rusanov`
 - Config `oned_hllc_energy`
 
-## Beyond
+## Milestone 19 — Roe + wave MHD
 
-- Roe / wave MHD / HLLD
-- Particle / Monte Carlo neutrons
-- Game-engine (Godot/Unity) / WebGPU volumetric client
-- Higher-fidelity nozzle / spacecraft trajectory coupling
+- `oned.riemann: roe` — Roe averages on momentum/energy
+- `oned.wave_mhd` — \(B^2/2\mu_0\) augments Riemann pressure (fast-wave-like)
+- Configs `oned_roe`, `oned_wave_mhd`
+
+## Milestone 20 — Monte Carlo neutrons
+
+- `blanket.transport: mc` — isotropic slab MC capture estimator
+- Config `dt_blanket_mc`
+
+## Milestone 21 — WebGPU volumetric viewer
+
+- `viewer/webgpu.html` — WebGPU volume-slice loop renderer + canvas fallback
+- Linked from canvas viewer / served by `make serve`
+
+## Milestone 22 — Nozzle + spacecraft trajectory
+
+- Ideal-expansion blend on magnetic nozzle (`expansion_ratio`, `thermal_velocity_blend`)
+- `spacecraft` post-process: mass, \(\Delta v\), acceleration series
+- Config `nozzle_trajectory`
+
+## Beyond (future)
+
+- Full HLLD / multi-D MHD
+- Production neutronics / CAD blanket
+- Native Godot/Unity client
+- 3DOF/6DOF orbital mechanics

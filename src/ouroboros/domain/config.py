@@ -164,20 +164,28 @@ class OneDSection(BaseModel):
     # Milestone 14: upwind momentum flux (cell_velocity only)
     momentum_flux: bool = False
     thermalize_momentum_flux: bool = True
-    # Milestone 15/16: none | rusanov | hllc (replaces cell_grad_p + upwind when set)
-    riemann: Literal["none", "rusanov", "hllc"] = "none"
-    # Milestone 17: Rusanov total-energy flux (requires riemann != none)
+    # Milestone 15–19: none | rusanov | hllc | roe (replaces cell_grad_p + upwind when set)
+    riemann: Literal["none", "rusanov", "hllc", "roe"] = "none"
+    # Milestone 17+: total-energy flux (requires riemann != none); solver follows riemann
     riemann_energy: bool = False
+    # Milestone 19: augment Riemann pressures with B²/2μ₀ (fast-wave-like)
+    wave_mhd: bool = False
+    wave_mhd_scale: float = 1.0
 
 
 class BlanketSection(BaseModel):
     """Neutron blanket channel (Milestone 9). Disabled = legacy instant neutron sink."""
 
     enabled: bool = False
-    capture_fraction: float = 0.9  # phenomenological
+    capture_fraction: float = 0.9  # phenomenological (used when transport=lumped)
     coolant_time_s: float = 0.5
     breeding_ratio: float = 1.05  # placeholder TBR
     initial_thermal_energy_j: float = 0.0
+    # Milestone 20: lumped | mc (MC estimates capture from optical depth)
+    transport: Literal["lumped", "mc"] = "lumped"
+    mc_optical_depth: float = 2.0
+    mc_particles: int = 64
+    mc_seed: int = 42
 
 
 class NozzleSection(BaseModel):
@@ -188,6 +196,19 @@ class NozzleSection(BaseModel):
     extract_fraction: float = 0.05  # fraction of zone inventory per extract_time
     extract_time_s: float = 0.2
     magnetic_efficiency: float = 0.6  # jet / extracted enthalpy
+    # Milestone 22: ideal-expansion blend
+    expansion_ratio: float = 1.0
+    gamma: float = 1.6666666667
+    thermal_velocity_blend: float = 0.0  # 0=magnetic only, 1=ideal rocket
+
+
+class SpacecraftSection(BaseModel):
+    """1D rocket / Δv post-processing from nozzle thrust (Milestone 22)."""
+
+    enabled: bool = False
+    dry_mass_kg: float = 500.0
+    wet_mass_kg: float = 800.0
+    include_thrust_accel: bool = True
 
 
 class SimulationConfig(BaseModel):
@@ -208,3 +229,4 @@ class SimulationConfig(BaseModel):
     reduced_mhd: ReducedMHDSection = Field(default_factory=ReducedMHDSection)
     blanket: BlanketSection = Field(default_factory=BlanketSection)
     nozzle: NozzleSection = Field(default_factory=NozzleSection)
+    spacecraft: SpacecraftSection = Field(default_factory=SpacecraftSection)

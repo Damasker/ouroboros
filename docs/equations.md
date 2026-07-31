@@ -220,6 +220,23 @@ E^*_K=\frac{(S_K-v_K)E_K-p_K v_K+p^* S_M}{S_K-S_M}.
 
 Piecewise HLLC flux on \(F_E=v(E+\kappa p)\) as for momentum; \(\dot U\) closure unchanged. Classification: simplified HLLC energy — not Roe/HLLD/MHD.
 
+## 4l. Roe + wave MHD (Milestone 19)
+
+Roe averages \(\tilde\rho=\sqrt{\rho_L\rho_R}\), \(\tilde v\) \(\sqrt\rho\)-weighted; \(c\sim\sqrt{\kappa\tilde p/\tilde\rho}\). Flux uses \(\tfrac12(F_L+F_R)-\tfrac12\sum|\lambda_k|\alpha_k r_k\). With `wave_mhd`, effective pressure includes \(B^2/2\mu_0\) from coil currents. Classification: simplified Roe / fast-wave proxy — not HLLD.
+
+## 4m. MC neutron capture (Milestone 20)
+
+Isotropic slab: \(P_{\mathrm{abs}}=1-e^{-\tau/|\mu|}\). Sampled capture fraction replaces `capture_fraction` when `blanket.transport: mc`.
+
+## 4n. Nozzle expansion blend + rocket Δv (Milestone 22)
+
+\[
+v_{\mathrm{id}}=\sqrt{\frac{2\gamma}{\gamma-1}\frac{kT}{m}\bigl(1-\varepsilon^{-(\gamma-1)}\bigr)},\quad
+v_{\mathrm{ex}}=(1-\beta)v_{\mathrm{mag}}+\beta\,\eta\,v_{\mathrm{id}}.
+\]
+
+Spacecraft: \(\dot m=- \dot m_{\mathrm{noz}}\), \(\dot{(\Delta v)}=T/m\) (post-processed series).
+
 ## 5. D–T fusion
 
 \[

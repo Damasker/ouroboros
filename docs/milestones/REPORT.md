@@ -171,3 +171,43 @@ Implemented: `hllc_energy_flux` with Toro \(S_L,S_R,S_M\), \(p^*\), \(E^*_K\); a
 Verified: closed-mesh identity \(\sum\dot U+\sum m v\dot v=0\); short 1D run energy-trusted.
 
 Known issues: phenomenological masses; sound speed without \(\gamma\); mass \(N\) still legacy face transport; not Roe/HLLD/MHD.
+
+## Milestone 19 — Roe + wave MHD
+
+**Status:** complete
+
+Implemented: `roe_momentum_flux` / `roe_energy_flux`; `oned.riemann: roe`; `oned.wave_mhd` adds \(B^2/2\mu_0\) into Riemann pressures; configs `oned_roe`, `oned_wave_mhd`.
+
+Verified: energy identity; short trusted 1D runs.
+
+Known issues: isothermal-like Roe (not full Euler entropy fix); wave-MHD is pressure augmentation only — not HLLD.
+
+## Milestone 20 — Monte Carlo neutrons
+
+**Status:** complete
+
+Implemented: `mc_neutron_capture_fraction` slab MC; `blanket.transport: mc` overrides capture; config `dt_blanket_mc`.
+
+Verified: deterministic seed; DT blanket MC run energy-trusted.
+
+Known issues: pedagogical slab model — not CAD/transport production neutronics.
+
+## Milestone 21 — WebGPU volumetric viewer
+
+**Status:** complete
+
+Implemented: `viewer/webgpu.html` with WebGPU textured loop volume-slice + canvas fallback; link from `viewer/index.html`.
+
+Verified: asset presence / API hooks in tests.
+
+Known issues: not a native game-engine client; volume is a 2D proxy texture, not true 3D tomography.
+
+## Milestone 22 — Nozzle + spacecraft trajectory
+
+**Status:** complete
+
+Implemented: ideal-expansion blend on nozzle; `spacecraft` section; `integrate_trajectory_series` post-process for \(\Delta v\) / mass / accel; config `nozzle_trajectory`.
+
+Verified: energy identity on nozzle channels; trajectory \(\Delta v\) monotonic; scenario trusted.
+
+Known issues: 1D rocket equation only — not orbital 6DOF.
