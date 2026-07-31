@@ -143,8 +143,20 @@ def build_site(
 
     viewer_dst = out / "viewer"
     shutil.copytree(root / "viewer", viewer_dst)
+    # Resolve /data relative to site root whether on custom domain or /repo/ project Pages
     (viewer_dst / "config.js").write_text(
-        "window.OUROBOROS = { mode: 'static', dataBase: '/data', domain: %s };\n"
+        """(function () {
+  var path = location.pathname || '/';
+  var root = path.indexOf('/viewer') >= 0 ? path.split('/viewer')[0] : '';
+  if (root === '/') root = '';
+  window.OUROBOROS = {
+    mode: 'static',
+    dataBase: root + '/data',
+    domain: %s,
+    siteRoot: root || '/'
+  };
+})();
+"""
         % json.dumps(domain),
         encoding="utf-8",
     )
@@ -154,13 +166,14 @@ def build_site(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0; url=/viewer/" />
-  <link rel="canonical" href="/viewer/" />
   <title>Ouroboros</title>
-  <script>location.replace('/viewer/');</script>
+  <script>
+    var base = location.pathname.replace(/\\/index\\.html$/, '').replace(/\\/$/, '');
+    location.replace(base + '/viewer/');
+  </script>
 </head>
 <body>
-  <p><a href="/viewer/">Open Ouroboros viewer</a></p>
+  <p><a href="viewer/">Open Ouroboros viewer</a></p>
 </body>
 </html>
 """,
