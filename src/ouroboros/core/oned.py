@@ -41,16 +41,33 @@ logger = logging.getLogger(__name__)
 
 
 class OneDLayout:
-    """State layout: [N_0,U_0,...,N_{nc-1},U_{nc-1}, v_a,v_b,I_a,I_b, acc..., N_He]."""
+    """
+    State layout for 1D system.
 
-    def __init__(self, n_cells: int) -> None:
+    dual_path / cell_pressure:
+      [N_0,U_0,...,N_{nc-1},U_{nc-1}, v_a,v_b,I_a,I_b, acc..., blanket...]
+
+    cell_velocity (Milestone 12):
+      [N_0,U_0,V_0,...,N_{nc-1},U_{nc-1},V_{nc-1}, I_a,I_b, acc..., blanket...]
+    """
+
+    def __init__(self, n_cells: int, *, cell_velocity: bool = False) -> None:
         self.n_cells = n_cells
-        base = 2 * n_cells
-        self.idx_v_a = base
-        self.idx_v_b = base + 1
-        self.idx_i_a = base + 2
-        self.idx_i_b = base + 3
-        acc0 = base + 4
+        self.cell_velocity = cell_velocity
+        if cell_velocity:
+            base = 3 * n_cells
+            self.idx_v_a = -1
+            self.idx_v_b = -1
+            self.idx_i_a = base
+            self.idx_i_b = base + 1
+            acc0 = base + 2
+        else:
+            base = 2 * n_cells
+            self.idx_v_a = base
+            self.idx_v_b = base + 1
+            self.idx_i_a = base + 2
+            self.idx_i_b = base + 3
+            acc0 = base + 4
         self.idx_acc_ext = acc0
         self.idx_acc_fus = acc0 + 1
         self.idx_acc_alpha = acc0 + 2
@@ -70,17 +87,22 @@ class OneDLayout:
         self.n_state = acc0 + 16
 
     def idx_n(self, i: int) -> int:
-        return 2 * i
+        return (3 * i) if self.cell_velocity else (2 * i)
 
     def idx_u(self, i: int) -> int:
-        return 2 * i + 1
+        return (3 * i + 1) if self.cell_velocity else (2 * i + 1)
+
+    def idx_v(self, i: int) -> int:
+        if not self.cell_velocity:
+            raise AttributeError("idx_v only valid in cell_velocity mode")
+        return 3 * i + 2
 
 
 class OneDSystem:
     """
     Conservative 1D finite-volume model along segment centerlines.
 
-    Classification: simplified physics (upwind advection of N and U; dual-path velocity ODEs).
+    Classification: simplified physics (upwind advection; dual-path or cell velocities).
     """
 
     def __init__(self, config: SimulationConfig, controller: Controller | None = None) -> None:
@@ -90,7 +112,8 @@ class OneDSystem:
         )
         self.reactivity = get_reactivity_model(config.fusion.reactivity_model)
         self.mesh = build_oned_mesh(config)
-        self.layout = OneDLayout(self.mesh.n_cells)
+        cell_vel = config.oned.momentum_mode == "cell_velocity"
+        self.layout = OneDLayout(self.mesh.n_cells, cell_velocity=cell_vel)
         self.events: list[SimulationEvent] = []
         self._control = ControlSignals(
             external_heater_w=config.drive.external_heater_w,
@@ -100,6 +123,11 @@ class OneDSystem:
         self._aborted = False
         self._energy_trusted = True
         self.e_state_initial = 0.0
+        self._cell_masses = None
+        if cell_vel:
+            from ouroboros.physics.momentum import cell_inertias_kg
+
+            self._cell_masses = cell_inertias_kg(self.mesh, config.plasma.effective_inertia_kg)
 
         self.throttle_a = MagneticThrottle(
             name="throttle_a",
@@ -139,8 +167,18 @@ class OneDSystem:
             U = thermal_energy_joule(dens, ti, dens, te, cell.volume_m3)
             y[L.idx_n(cell.global_index)] = N
             y[L.idx_u(cell.global_index)] = U
-        y[L.idx_v_a] = cfg.plasma.initial_flow_a_m_s
-        y[L.idx_v_b] = cfg.plasma.initial_flow_b_m_s
+            if L.cell_velocity:
+                if cell.path == "a":
+                    y[L.idx_v(cell.global_index)] = cfg.plasma.initial_flow_a_m_s
+                elif cell.path == "b":
+                    y[L.idx_v(cell.global_index)] = cfg.plasma.initial_flow_b_m_s
+                else:
+                    y[L.idx_v(cell.global_index)] = 0.5 * (
+                        cfg.plasma.initial_flow_a_m_s + cfg.plasma.initial_flow_b_m_s
+                    )
+        if not L.cell_velocity:
+            y[L.idx_v_a] = cfg.plasma.initial_flow_a_m_s
+            y[L.idx_v_b] = cfg.plasma.initial_flow_b_m_s
         y[L.idx_i_a] = cfg.throttle_a.initial_current_a
         y[L.idx_i_b] = cfg.throttle_b.initial_current_a
         if self.mesh.chamber_cells:
@@ -150,12 +188,43 @@ class OneDSystem:
         self.e_state_initial = self._state_energy(y)
         return y
 
+    def _path_mean_velocity(self, y: np.ndarray, path: str) -> float:
+        L = self.layout
+        if not L.cell_velocity:
+            if path == "a":
+                return float(y[L.idx_v_a])
+            if path == "b":
+                return float(y[L.idx_v_b])
+            return 0.5 * (float(y[L.idx_v_a]) + float(y[L.idx_v_b]))
+        masses = self._cell_masses or [1.0] * L.n_cells
+        num = den = 0.0
+        for cell in self.mesh.cells:
+            if path == "common":
+                if cell.path not in (None, "common"):
+                    continue
+            elif cell.path != path:
+                continue
+            i = cell.global_index
+            m = masses[i]
+            num += m * float(y[L.idx_v(i)])
+            den += m
+        if den <= 0.0:
+            # fallback: any cells
+            for i in range(L.n_cells):
+                num += masses[i] * float(y[L.idx_v(i)])
+                den += masses[i]
+        return num / max(den, 1e-30)
+
     def _state_energy(self, y: np.ndarray) -> float:
         cfg = self.config
         L = self.layout
         e_int = float(sum(y[L.idx_u(i)] for i in range(L.n_cells)))
-        m_eff = cfg.plasma.effective_inertia_kg
-        e_kin = 0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2)
+        if L.cell_velocity:
+            masses = self._cell_masses or [cfg.plasma.effective_inertia_kg / max(L.n_cells, 1)] * L.n_cells
+            e_kin = 0.5 * sum(masses[i] * float(y[L.idx_v(i)]) ** 2 for i in range(L.n_cells))
+        else:
+            m_eff = cfg.plasma.effective_inertia_kg
+            e_kin = 0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2)
         e_mag = 0.5 * cfg.throttle_a.inductance_h * float(y[L.idx_i_a]) ** 2
         e_mag += 0.5 * cfg.throttle_b.inductance_h * float(y[L.idx_i_b]) ** 2
         e_bl = float(y[L.idx_e_blanket]) if cfg.blanket.enabled else 0.0
@@ -169,6 +238,13 @@ class OneDSystem:
             return v_b
         return 0.5 * (v_a + v_b)
 
+    def _face_velocity(self, face_path: str, y: np.ndarray, li: int, ri: int, v_a: float, v_b: float) -> float:
+        L = self.layout
+        if L.cell_velocity:
+            # Upwind later; use average for face advection speed sign
+            return 0.5 * (float(y[L.idx_v(li)]) + float(y[L.idx_v(ri)]))
+        return self._path_velocity(face_path, v_a, v_b)
+
     def rhs(self, t: float, y: np.ndarray) -> np.ndarray:
         if self._aborted:
             return np.zeros_like(y)
@@ -178,8 +254,8 @@ class OneDSystem:
         mesh = self.mesh
         dydt = np.zeros_like(y)
 
-        v_a = float(y[L.idx_v_a])
-        v_b = float(y[L.idx_v_b])
+        v_a = self._path_mean_velocity(y, "a")
+        v_b = self._path_mean_velocity(y, "b")
         i_a = float(y[L.idx_i_a])
         i_b = float(y[L.idx_i_b])
 
@@ -251,7 +327,7 @@ class OneDSystem:
 
         # Upwind finite-volume fluxes
         for face in mesh.faces:
-            u = self._path_velocity(face.path, v_a, v_b)
+            u = self._face_velocity(face.path, y, face.left, face.right, v_a, v_b)
             valve = 1.0
             if face.valve_key == "a":
                 valve = valve_a
@@ -259,7 +335,15 @@ class OneDSystem:
                 valve = valve_b
             u_eff = u * valve * face.split_fraction
             li, ri = face.left, face.right
-            if u_eff >= 0.0:
+            if L.cell_velocity:
+                # Upwind by cell velocity average sign
+                if u_eff >= 0.0:
+                    n_up = dens[li]
+                    e_spec = Us[li] / max(Ns[li], 1e-30)
+                else:
+                    n_up = dens[ri]
+                    e_spec = Us[ri] / max(Ns[ri], 1e-30)
+            elif u_eff >= 0.0:
                 n_up = dens[li]
                 e_spec = Us[li] / max(Ns[li], 1e-30)  # J per particle
             else:
@@ -359,7 +443,7 @@ class OneDSystem:
             dydt[L.idx_n(i)] = float(dN[i])
             dydt[L.idx_u(i)] = float(dU[i])
 
-        # Momentum / throttles (Milestone 8 coupling modes)
+        # Momentum / throttles
         ra = cfg.throttle_a.resistance_ohm
         rb = cfg.throttle_b.resistance_ohm
         if cfg.faults.force_quench_a or self.throttle_a.status == ThrottleStatus.QUENCH:
@@ -369,76 +453,157 @@ class OneDSystem:
             rb = max(rb, cfg.throttle_b.quench_resistance_ohm)
             self.throttle_b.status = ThrottleStatus.QUENCH
 
-        from ouroboros.core.dynamics import dual_path_throttle_step
-        from ouroboros.physics.momentum import path_pressure_forces_from_cells
-
-        def zone_pressure(zid: str, fallback: float) -> float:
-            dens_z, temp_ev = self._zone_mean(y, zid)
-            if dens_z <= 0.0:
-                return fallback
-            t_k = ev_to_kelvin(temp_ev)
-            return pressure_pa(dens_z, t_k, dens_z, t_k)
-
-        p_c = pressure_pa(dens_c, temp_c, dens_c, temp_c) if dens_c > 0 else 0.0
-        p_a = zone_pressure("branch_a", p_c)
-        p_b = zone_pressure("branch_b", p_c)
-        p_r = zone_pressure("return_channel", p_c)
-
         cell_pressures = [
             pressure_pa(float(dens[i]), float(temps[i]), float(dens[i]), float(temps[i]))
             for i in range(L.n_cells)
         ]
         extra_a = extra_b = 0.0
-        cell_heat: tuple[float, ...] = tuple(0.0 for _ in range(L.n_cells))
-        if cfg.oned.momentum_mode == "cell_pressure":
-            ppf = path_pressure_forces_from_cells(
+        p_friction = 0.0
+        p_drive_work = 0.0
+        p_mag_loss = 0.0
+
+        if L.cell_velocity:
+            from ouroboros.physics.coupling import path_throttle_rhs
+            from ouroboros.physics.momentum import cell_grad_p_forces
+
+            masses = self._cell_masses or [1e-4 / L.n_cells] * L.n_cells
+            vs = [float(y[L.idx_v(i)]) for i in range(L.n_cells)]
+            gpf = cell_grad_p_forces(
                 mesh,
                 pressures_pa=cell_pressures,
+                velocities_m_s=vs,
                 scale=cfg.oned.pressure_force_scale,
+                compressional_exchange=cfg.oned.compressional_exchange,
+            )
+            for i, hw in enumerate(gpf.cell_heating_w):
+                if hw != 0.0:
+                    dydt[L.idx_u(i)] += hw
+
+            # Path-a / path-b cell index lists
+            idx_a = [c.global_index for c in mesh.cells if c.path == "a"]
+            idx_b = [c.global_index for c in mesh.cells if c.path == "b"]
+            m_a = sum(masses[i] for i in idx_a) or 1e-30
+            m_b = sum(masses[i] for i in idx_b) or 1e-30
+
+            da = path_throttle_rhs(
+                velocity_m_s=v_a,
+                current_a=i_a,
+                force_nonmagnetic_n=0.0,
+                effective_inertia_kg=m_a,
+                inductance_h=cfg.throttle_a.inductance_h,
+                resistance_ohm=ra,
+                coupling_mode=cfg.throttle_a.coupling_mode,
+                emf_coeff_v_s_per_m=cfg.throttle_a.emf_coeff_v_s_per_m,
+                coupling_force_coeff_n_per_a=cfg.throttle_a.coupling_force_coeff_n_per_a,
+                mutual_inductance_h=cfg.throttle_a.mutual_inductance_h,
+            )
+            db = path_throttle_rhs(
+                velocity_m_s=v_b,
+                current_a=i_b,
+                force_nonmagnetic_n=0.0,
+                effective_inertia_kg=m_b,
+                inductance_h=cfg.throttle_b.inductance_h,
+                resistance_ohm=rb,
+                coupling_mode=cfg.throttle_b.coupling_mode,
+                emf_coeff_v_s_per_m=cfg.throttle_b.emf_coeff_v_s_per_m,
+                coupling_force_coeff_n_per_a=cfg.throttle_b.coupling_force_coeff_n_per_a,
+                mutual_inductance_h=cfg.throttle_b.mutual_inductance_h,
+            )
+            dydt[L.idx_i_a] = da.dI_dt
+            dydt[L.idx_i_b] = db.dI_dt
+            p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
+
+            b_tot = cfg.plasma.friction_coeff_kg_s
+            for i in range(L.n_cells):
+                cell = mesh.cells[i]
+                f = gpf.force_n[i]
+                # Friction share ~ mass fraction
+                b_i = b_tot * (masses[i] / max(cfg.plasma.effective_inertia_kg, 1e-30))
+                f_fric = -b_i * vs[i]
+                p_friction += -f_fric * vs[i]
+                f_drive = 0.0
+                if cell.path == "a" and idx_a:
+                    f_drive = cfg.drive.drive_force_a_n * (masses[i] / m_a)
+                    f += da.f_magnetic_n * (masses[i] / m_a)
+                elif cell.path == "b" and idx_b:
+                    f_drive = cfg.drive.drive_force_b_n * (masses[i] / m_b)
+                    f += db.f_magnetic_n * (masses[i] / m_b)
+                p_drive_work += f_drive * vs[i]
+                f += f_fric + f_drive
+                dydt[L.idx_v(i)] = f / max(masses[i], 1e-30)
+
+            extra_a = float(sum(gpf.force_n[i] for i in idx_a))
+            extra_b = float(sum(gpf.force_n[i] for i in idx_b))
+            step_heat = 0.0
+            step_diss = 0.0
+        else:
+            from ouroboros.core.dynamics import dual_path_throttle_step
+            from ouroboros.physics.momentum import path_pressure_forces_from_cells
+
+            def zone_pressure(zid: str, fallback: float) -> float:
+                dens_z, temp_ev = self._zone_mean(y, zid)
+                if dens_z <= 0.0:
+                    return fallback
+                t_k = ev_to_kelvin(temp_ev)
+                return pressure_pa(dens_z, t_k, dens_z, t_k)
+
+            p_c = pressure_pa(dens_c, temp_c, dens_c, temp_c) if dens_c > 0 else 0.0
+            p_a = zone_pressure("branch_a", p_c)
+            p_b = zone_pressure("branch_b", p_c)
+            p_r = zone_pressure("return_channel", p_c)
+
+            cell_heat: tuple[float, ...] = tuple(0.0 for _ in range(L.n_cells))
+            if cfg.oned.momentum_mode == "cell_pressure":
+                ppf = path_pressure_forces_from_cells(
+                    mesh,
+                    pressures_pa=cell_pressures,
+                    scale=cfg.oned.pressure_force_scale,
+                    v_a=v_a,
+                    v_b=v_b,
+                )
+                extra_a, extra_b = ppf.force_a_n, ppf.force_b_n
+                if cfg.oned.compressional_exchange:
+                    cell_heat = ppf.cell_heating_w
+
+            step = dual_path_throttle_step(
+                cfg=cfg,
                 v_a=v_a,
                 v_b=v_b,
+                i_a=i_a,
+                i_b=i_b,
+                dens_a=dens_a,
+                dens_b=dens_b,
+                resistance_a=ra,
+                resistance_b=rb,
+                p_a_pa=p_a,
+                p_b_pa=p_b,
+                p_c_pa=p_c,
+                p_r_pa=p_r,
+                extra_force_a_n=extra_a,
+                extra_force_b_n=extra_b,
             )
-            extra_a, extra_b = ppf.force_a_n, ppf.force_b_n
-            if cfg.oned.compressional_exchange:
-                cell_heat = ppf.cell_heating_w
+            da, db = step.path_a, step.path_b
+            dydt[L.idx_v_a] = da.dv_dt
+            dydt[L.idx_v_b] = db.dv_dt
+            dydt[L.idx_i_a] = da.dI_dt
+            dydt[L.idx_i_b] = db.dI_dt
+            if ch_cells and step.plasma_heating_w != 0.0:
+                share = step.plasma_heating_w / len(ch_cells)
+                for ci in ch_cells:
+                    dydt[L.idx_u(ci)] += share
+            for i, hw in enumerate(cell_heat):
+                if hw != 0.0:
+                    dydt[L.idx_u(i)] += hw
+            p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
+            p_friction = (
+                cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + step.dissipative_power_w
+            )
+            p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
+            step_heat = step.plasma_heating_w
+            step_diss = step.dissipative_power_w
 
-        step = dual_path_throttle_step(
-            cfg=cfg,
-            v_a=v_a,
-            v_b=v_b,
-            i_a=i_a,
-            i_b=i_b,
-            dens_a=dens_a,
-            dens_b=dens_b,
-            resistance_a=ra,
-            resistance_b=rb,
-            p_a_pa=p_a,
-            p_b_pa=p_b,
-            p_c_pa=p_c,
-            p_r_pa=p_r,
-            extra_force_a_n=extra_a,
-            extra_force_b_n=extra_b,
-        )
-        da, db = step.path_a, step.path_b
-        dydt[L.idx_v_a] = da.dv_dt
-        dydt[L.idx_v_b] = db.dv_dt
-        dydt[L.idx_i_a] = da.dI_dt
-        dydt[L.idx_i_b] = db.dI_dt
-        if ch_cells and step.plasma_heating_w != 0.0:
-            share = step.plasma_heating_w / len(ch_cells)
-            for ci in ch_cells:
-                dydt[L.idx_u(ci)] += share
-        for i, hw in enumerate(cell_heat):
-            if hw != 0.0:
-                dydt[L.idx_u(i)] += hw
         if abs(i_a) > 1e8 or abs(i_b) > 1e8:
             raise NonPhysicalStateError(f"Throttle current overflow at t={t}")
-
-        p_mag_loss = (da.ohmic_power_w + db.ohmic_power_w) if cfg.losses.magnetic else 0.0
-        p_friction = (
-            cfg.plasma.friction_coeff_kg_s * (v_a * v_a + v_b * v_b) + step.dissipative_power_w
-        )
-        p_drive_work = cfg.drive.drive_force_a_n * v_a + cfg.drive.drive_force_b_n * v_b
 
         dydt[L.idx_acc_ext] = p_ext + p_syn
         dydt[L.idx_acc_fus] = p_fusion
@@ -474,10 +639,11 @@ class OneDSystem:
                 **dict(self._control.metadata),
                 "blanket_coolant_w": bpow.coolant_extract_w,
                 "neutron_leak_w": bpow.leaked_w,
-                "mhd_dissipative_w": step.dissipative_power_w,
-                "mhd_plasma_heating_w": step.plasma_heating_w,
+                "mhd_dissipative_w": step_diss if not L.cell_velocity else 0.0,
+                "mhd_plasma_heating_w": step_heat if not L.cell_velocity else 0.0,
                 "cell_pressure_force_a_n": extra_a,
                 "cell_pressure_force_b_n": extra_b,
+                "momentum_mode": cfg.oned.momentum_mode,
             },
         )
         return dydt
@@ -488,9 +654,15 @@ class OneDSystem:
         m_eff = cfg.plasma.effective_inertia_kg
         from ouroboros.core.blanket_integration import fill_neutron_ledger_fields
 
+        if L.cell_velocity:
+            masses = self._cell_masses or [m_eff / max(L.n_cells, 1)] * L.n_cells
+            e_kin = 0.5 * sum(masses[i] * float(y[L.idx_v(i)]) ** 2 for i in range(L.n_cells))
+        else:
+            e_kin = 0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2)
+
         ledger = EnergyLedger(
             e_internal_j=float(sum(y[L.idx_u(i)] for i in range(L.n_cells))),
-            e_kinetic_j=0.5 * m_eff * (float(y[L.idx_v_a]) ** 2 + float(y[L.idx_v_b]) ** 2),
+            e_kinetic_j=float(e_kin),
             e_magnetic_j=(
                 0.5 * cfg.throttle_a.inductance_h * float(y[L.idx_i_a]) ** 2
                 + 0.5 * cfg.throttle_b.inductance_h * float(y[L.idx_i_b]) ** 2
@@ -547,8 +719,8 @@ class OneDSystem:
         dens_c, temp_c = self._zone_mean(y, "reaction_chamber")
         A = cfg.geometry.branch_cross_section_m2
         m = cfg.plasma.mean_particle_mass_kg
-        v_a = float(y[L.idx_v_a])
-        v_b = float(y[L.idx_v_b])
+        v_a = self._path_mean_velocity(y, "a")
+        v_b = self._path_mean_velocity(y, "b")
         diag = self._last_diag
         out: dict[str, float] = {
             "density_a": dens_a,
@@ -592,6 +764,8 @@ class OneDSystem:
                 cell = self.mesh.cells[i]
                 n = float(y[L.idx_n(i)])
                 out[f"cell_density:{zid}:{cell.local_index}"] = n / cell.volume_m3
+                if L.cell_velocity:
+                    out[f"cell_velocity:{zid}:{cell.local_index}"] = float(y[L.idx_v(i)])
         return out
 
     def check_energy_or_raise(self, y: np.ndarray, t: float) -> EnergyLedger:

@@ -79,9 +79,15 @@ See `docs/milestones/REPORT.md` for verification notes.
 - Compressional cell heating for ledger closure
 - Browser viewer at `/viewer` (served by `make serve`)
 
+## Milestone 12 — Cell-local axial velocity (1D)
+
+- `oned.momentum_mode: cell_velocity` — per-cell \(V_i\) in the state vector
+- Face \(-\nabla p\) forces, distributed friction / drive / throttle coupling
+- Advection uses cell velocities; config `oned_cell_velocity`
+
 ## Beyond
 
-- Full cell-local velocity state / wave MHD
+- Momentum-flux Riemann / wave MHD
 - Particle / Monte Carlo neutrons
-- Game-engine (Godot/Unity) client
+- Game-engine (Godot/Unity) / WebGPU volumetric client
 - Magnetic nozzle / propulsion config (separate product line)

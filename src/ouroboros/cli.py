@@ -28,6 +28,7 @@ SCENARIO_CONFIGS = {
     "multizone-dt": "configs/multizone_dt.yaml",
     "oned-dt": "configs/oned_dt.yaml",
     "oned-cell-momentum": "configs/oned_cell_momentum.yaml",
+    "oned-cell-velocity": "configs/oned_cell_velocity.yaml",
     "reduced-mhd": "configs/reduced_mhd.yaml",
     "fault-block-a": "configs/faults/block_branch_a.yaml",
     "fault-quench": "configs/faults/quench.yaml",

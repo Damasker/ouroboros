@@ -1,0 +1,70 @@
+# 1D loop with per-cell axial velocity (Milestone 12)
+simulation:
+  duration_s: 0.25
+  output_interval_s: 0.01
+  scenario: oned-cell-velocity
+  model: oned
+  integrator:
+    method: LSODA
+    rtol: 1.0e-6
+    atol: 1.0e-9
+    max_step_s: 2.0e-3
+geometry:
+  chamber_volume_m3: 1.0
+  branch_a_volume_m3: 0.4
+  branch_b_volume_m3: 0.4
+  return_channel_volume_m3: 0.3
+  expansion_volume_m3: 0.2
+  branch_cross_section_m2: 0.05
+plasma:
+  initial_density_m3: 1.0e19
+  initial_ion_temperature_ev: 100.0
+  initial_electron_temperature_ev: 100.0
+  initial_flow_a_m_s: 40.0
+  initial_flow_b_m_s: 36.0
+  effective_inertia_kg: 1.0e-4
+  friction_coeff_kg_s: 3.0e-4
+  confinement_time_s: 0.2
+throttle_a:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0
+  initial_current_a: 5.0
+  coupling_mode: consistent
+  emf_coeff_v_s_per_m: 1.0e-3
+throttle_b:
+  inductance_h: 1.0e-3
+  resistance_ohm: 1.0e-3
+  mutual_inductance_h: 0.0
+  initial_current_a: 4.0
+  coupling_mode: consistent
+  emf_coeff_v_s_per_m: 1.0e-3
+fusion:
+  enabled: false
+losses:
+  bremsstrahlung: false
+  transport: false
+  wall: false
+  exhaust: false
+  magnetic: true
+drive:
+  drive_force_a_n: 2.0e-3
+  drive_force_b_n: 1.5e-3
+controller:
+  type: none
+energy:
+  relative_tolerance: 1.0e-3
+  absolute_floor_j: 1.0e-6
+oned:
+  geometry_file: geometry/loop_geometry.json
+  cells_per_segment: 3
+  export_cells_in_snapshot: true
+  momentum_mode: cell_velocity
+  pressure_force_scale: 1.0e-7
+  compressional_exchange: true
+reduced_mhd:
+  enabled: false
+  pressure_drive: false
+numerics:
+  max_nfev: 100000
+faults: {}

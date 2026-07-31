@@ -156,10 +156,10 @@ class OneDSection(BaseModel):
     geometry_file: str | None = "geometry/loop_geometry.json"
     cells_per_segment: int = 4
     export_cells_in_snapshot: bool = True
-    # Milestone 11: dual_path (default) | cell_pressure (face Δp·A → path forces)
-    momentum_mode: Literal["dual_path", "cell_pressure"] = "dual_path"
+    # Milestone 11/12: dual_path | cell_pressure | cell_velocity
+    momentum_mode: Literal["dual_path", "cell_pressure", "cell_velocity"] = "dual_path"
     pressure_force_scale: float = 1.0e-6
-    # When cell_pressure: exchange face work with cell U (ledger-safe)
+    # When cell_pressure / cell_velocity: exchange pressure work with cell U
     compressional_exchange: bool = True
 
 

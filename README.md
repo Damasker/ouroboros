@@ -53,6 +53,7 @@ make run-scenario SCENARIO=oned-dt
 make run-scenario SCENARIO=dt-blanket
 make run-scenario SCENARIO=reduced-mhd
 make run-scenario SCENARIO=oned-cell-momentum
+make run-scenario SCENARIO=oned-cell-velocity
 ```
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.

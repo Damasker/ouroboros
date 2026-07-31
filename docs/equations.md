@@ -135,6 +135,18 @@ F_{\mathrm{face}}=\kappa(p_L-p_R)A
 
 summed onto path A/B (common faces split ½). Face work \(F_{\mathrm{face}} u_{\mathrm{path}}\) is removed equally from the two adjacent cell internal energies. Classification: simplified hydro mapped onto dual-path ODEs — **not** a cell-local velocity field.
 
+## 4e. Cell-local axial velocity (Milestone 12)
+
+With `oned.momentum_mode: cell_velocity`, each cell carries \(V_i\). Pressure forces use face pressures \(p_f=\tfrac12(p_L+p_R)\):
+
+\[
+F_i=\kappa A(p_{i-1/2}-p_{i+1/2}),\qquad
+m_i=\frac{V_i}{V_{\mathrm{tot}}}M_{\mathrm{eff}},\qquad
+m_i\dot V_i=F_i+F_{\mathrm{fric},i}+F_{\mathrm{drive},i}+F_{\mathrm{mag},i}.
+\]
+
+Compressional exchange: \(\dot U_i=-F_i^{\mathrm{pressure}} V_i\). Throttle circuits couple to mass-weighted path means. Classification: simplified 1D FV momentum — not a Riemann MHD solver.
+
 ## 5. D–T fusion
 
 \[

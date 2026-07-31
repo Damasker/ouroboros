@@ -101,3 +101,13 @@ Implemented: `physics/momentum.py` face \(\Delta p\,A\) → path forces with per
 Verified: cell-pressure heating identity \(\sum P_{\mathrm{heat}}=-(F_a v_a+F_b v_b)\); 1D energy trusted; viewer + geometry HTTP smoke tests.
 
 Known issues: path velocities remain two ODEs (not per-cell \(v\)); viewer is a 2D schematic, not a full 3D client.
+
+## Milestone 12 — Cell-local axial velocity
+
+**Status:** complete
+
+Implemented: `OneDLayout` cell-velocity packing \((N,U,V)\) per cell; FV \(-\nabla p\) via face pressures; mass-weighted path means for throttle EMF; distributed friction/drive/magnetic force; compressional \(F_i v_i\leftrightarrow U_i\); config `oned_cell_velocity`.
+
+Verified: heating identity; inertia partition; short 1D run energy-trusted with `cell_velocity:*` series.
+
+Known issues: no momentum advection / Riemann fluxes; chamber/return cells lack path-throttle forces by design.
