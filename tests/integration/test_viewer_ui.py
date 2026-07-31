@@ -14,6 +14,14 @@ def test_shared_styles_exist():
     assert "@keyframes" in css
 
 
+def test_static_api_helper():
+    api = (ROOT / "viewer" / "api.js").read_text(encoding="utf-8")
+    assert "OuroborosAPI" in api
+    assert "static" in api
+    cfg = (ROOT / "viewer" / "config.js").read_text(encoding="utf-8")
+    assert "OUROBOROS" in cfg
+
+
 def test_schematic_app_shell():
     html = (ROOT / "viewer" / "index.html").read_text(encoding="utf-8")
     assert "Ouroboros" in html

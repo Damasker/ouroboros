@@ -39,6 +39,14 @@ campaign:
 serve:
 	$(PYTHON) -m ouroboros.cli --root . serve --host $(HOST) --port $(PORT)
 
+# Build static gallery for GitHub Pages / ouroboros.beart.cc
+DOMAIN ?= ouroboros.beart.cc
+publish-site:
+	$(PYTHON) scripts/export_public_site.py --root . --out site --domain $(DOMAIN)
+
+docker-web:
+	docker build -f Dockerfile.web -t ouroboros-web:latest .
+
 demo: setup
 	$(MAKE) run-scenario SCENARIO=passive
 	$(MAKE) visualize RUN=passive

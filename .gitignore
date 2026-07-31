@@ -15,6 +15,9 @@ venv/
 results/*
 !results/.gitkeep
 
+# Static export (built by CI / make publish-site)
+site/
+
 # OS / editor
 .DS_Store
 .idea/

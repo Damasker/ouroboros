@@ -77,6 +77,13 @@ App UI (after `make serve`):
 
 Keyboard in schematic: `Space` play/pause, `←`/`→` step frames, `F` cycle field.
 
+**Public site:** [https://ouroboros.beart.cc](https://ouroboros.beart.cc) (GitHub Pages gallery). See [docs/deploy.md](docs/deploy.md) for DNS + Docker.
+
+```bash
+make publish-site DOMAIN=ouroboros.beart.cc
+docker build -f Dockerfile.web -t ouroboros-web .
+```
+
 Native clients: `clients/godot/`, `clients/unity/`; protocol at `/client/protocol`, stream at `/runs/<id>/client-stream`.
 
 Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-helium`, `fault-density-spike`, `fault-cooling-loss`.

@@ -1,0 +1,24 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt pyproject.toml README.md ./
+COPY src ./src
+COPY configs ./configs
+COPY viewer ./viewer
+COPY geometry ./geometry
+COPY Makefile ./
+
+RUN pip install --no-cache-dir -U pip \
+ && pip install --no-cache-dir -e . \
+ && python -c "from ouroboros.geometry import default_loop_geometry; from pathlib import Path; Path('geometry').mkdir(exist_ok=True); default_loop_geometry().save('geometry/loop_geometry.json')"
+
+# Seed a few demo runs for the public gallery
+RUN for s in passive oned-hlld magnetic-nozzle orbit-3dof; do \
+      python -m ouroboros.cli --root . run --scenario $s --run-id $s || true; \
+    done
+
+ENV HOST=0.0.0.0
+ENV PORT=8765
+EXPOSE 8765
+
+CMD ["python", "-m", "ouroboros.cli", "--root", ".", "serve", "--host", "0.0.0.0", "--port", "8765"]

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ouroboros — Client Protocol</title>
   <link rel="stylesheet" href="/viewer/styles.css" />
+  <script src="/viewer/config.js"></script>
+  <script src="/viewer/api.js"></script>
 </head>
 <body>
   <div class="app">
@@ -65,9 +67,13 @@
     async function load() {
       $("err").textContent = "";
       try {
-        const r = await fetch("/client/protocol");
-        if (!r.ok) throw new Error(`/client/protocol → ${r.status}`);
-        const data = await r.json();
+        const data = window.OuroborosAPI
+          ? await OuroborosAPI.apiJSON("/client/protocol")
+          : await (async () => {
+              const r = await fetch("/client/protocol");
+              if (!r.ok) throw new Error(`/client/protocol → ${r.status}`);
+              return r.json();
+            })();
         $("manifest").textContent = JSON.stringify(data, null, 2);
         $("pill").textContent = `v${data.version || "?"}`;
         $("pill").className = "pill ok";

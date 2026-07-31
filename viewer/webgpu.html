@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ouroboros — Volumetric Viewer</title>
   <link rel="stylesheet" href="/viewer/styles.css" />
+  <script src="/viewer/config.js"></script>
+  <script src="/viewer/api.js"></script>
 </head>
 <body>
   <div class="app">
@@ -103,6 +105,13 @@
   <script type="module">
     const $ = (id) => document.getElementById(id);
     const state = { frames: [], playing: false, raf: 0, lastTs: 0, gpu: null };
+    const apiJSON = (path) =>
+      window.OuroborosAPI
+        ? OuroborosAPI.apiJSON(path)
+        : fetch(path).then((r) => {
+            if (!r.ok) throw new Error(`${path} → ${r.status}`);
+            return r.json();
+          });
 
     const LAYOUT = {
       branch_a: [[0.18, 0.28], [0.42, 0.18], [0.62, 0.22], [0.78, 0.35]],
@@ -111,12 +120,6 @@
       return_channel: [[0.18, 0.72], [0.12, 0.50], [0.18, 0.28]],
       expansion_nozzle: [[0.84, 0.50], [0.94, 0.50]],
     };
-
-    async function fetchJSON(url) {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`${url} → ${r.status}`);
-      return r.json();
-    }
 
     function setEmpty(on) { $("empty").classList.toggle("visible", on); }
 
@@ -311,7 +314,7 @@ struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }
     }
 
     async function loadRuns() {
-      const data = await fetchJSON("/runs");
+      const data = await apiJSON("/runs");
       const sel = $("run");
       sel.innerHTML = "";
       for (const run of data.runs || []) {
@@ -329,7 +332,7 @@ struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }
     async function loadRun(runId) {
       if (!runId) { setEmpty(true); return; }
       $("err").textContent = "";
-      const data = await fetchJSON(`/runs/${encodeURIComponent(runId)}/snapshots`);
+      const data = await apiJSON(`/runs/${encodeURIComponent(runId)}/snapshots`);
       state.frames = data.frames || [];
       $("frame").max = Math.max(0, state.frames.length - 1);
       $("frame").value = 0;
