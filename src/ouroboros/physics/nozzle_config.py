@@ -16,16 +16,16 @@ def nozzle_kwargs(
     enabled: bool,
     ion_temperature_k: float = 0.0,
 ) -> dict[str, Any]:
-    return dict(
-        n_particles=n_particles,
-        internal_energy_j=internal_energy_j,
-        mean_particle_mass_kg=mean_particle_mass_kg,
-        extract_time_s=nozzle.extract_time_s,
-        extract_fraction=nozzle.extract_fraction,
-        magnetic_efficiency=nozzle.magnetic_efficiency,
-        enabled=enabled,
-        expansion_ratio=nozzle.expansion_ratio,
-        gamma=nozzle.gamma,
-        thermal_velocity_blend=nozzle.thermal_velocity_blend,
-        ion_temperature_k=ion_temperature_k,
-    )
+    return {
+        "n_particles": n_particles,
+        "internal_energy_j": internal_energy_j,
+        "mean_particle_mass_kg": mean_particle_mass_kg,
+        "extract_time_s": nozzle.extract_time_s,
+        "extract_fraction": nozzle.extract_fraction,
+        "magnetic_efficiency": nozzle.magnetic_efficiency,
+        "enabled": enabled,
+        "expansion_ratio": nozzle.expansion_ratio,
+        "gamma": nozzle.gamma,
+        "thermal_velocity_blend": nozzle.thermal_velocity_blend,
+        "ion_temperature_k": ion_temperature_k,
+    }

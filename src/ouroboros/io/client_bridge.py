@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 PROTOCOL_VERSION = "1.0.0"
 
 

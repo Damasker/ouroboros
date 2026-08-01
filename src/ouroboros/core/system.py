@@ -478,7 +478,6 @@ class LoopSystem:
 
         # Magnetic nozzle (lumped: chamber is the extraction proxy)
         from ouroboros.physics.nozzle import magnetic_nozzle_powers
-
         from ouroboros.physics.nozzle_config import nozzle_kwargs
 
         nz = magnetic_nozzle_powers(

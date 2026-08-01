@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from ouroboros.core import run_simulation
 from ouroboros.io import load_config
 from ouroboros.physics.neutron_mc import mc_neutron_capture_fraction

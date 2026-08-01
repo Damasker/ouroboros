@@ -5,6 +5,7 @@ Classification: phenomenological 1D rocket equation — not orbital mechanics.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from ouroboros.domain.config import SpacecraftSection
@@ -47,9 +48,9 @@ def integrate_trajectory_series(
     for i in range(n):
         t = thrust_n[i] if i < len(thrust_n) else 0.0
         mdot = mass_flow_kg_s[i] if i < len(mass_flow_kg_s) else 0.0
-        if not (t == t):  # NaN
+        if math.isnan(t):
             t = 0.0
-        if not (mdot == mdot):
+        if math.isnan(mdot):
             mdot = 0.0
         m_eff = max(m, dry)
         a = t / m_eff if spacecraft.include_thrust_accel else 0.0

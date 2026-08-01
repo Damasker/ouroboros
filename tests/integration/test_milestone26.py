@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -30,7 +31,7 @@ def test_orbit_keeps_finite_radius():
         mass_flow_kg_s=[0.0, 0.0, 0.0],
         spacecraft=sc,
     )
-    assert all(r == r and r > 1e6 for r in out["orbit_radius_m"])
+    assert all(math.isfinite(r) and r > 1e6 for r in out["orbit_radius_m"])
 
 
 def test_orbit_3dof_scenario():

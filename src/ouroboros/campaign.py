@@ -6,6 +6,7 @@ import csv
 import itertools
 import json
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -113,7 +114,7 @@ def run_campaign(
             write_run_directory(result, out_dir)
         fus = result.series.get("fusion_power_w", [0.0])
         q = result.series.get("q_factor", [float("nan")])
-        q_ok = [x for x in q if isinstance(x, (int, float)) and x == x]
+        q_ok = [x for x in q if isinstance(x, (int, float)) and not math.isnan(float(x))]
         row: dict[str, Any] = {
             "run_id": run_id,
             "energy_trusted": result.energy_trusted,

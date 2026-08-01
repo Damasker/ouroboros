@@ -59,9 +59,9 @@ def integrate_orbit3dof_series(
     for i in range(n):
         t = thrust_n[i] if i < len(thrust_n) else 0.0
         mdot = mass_flow_kg_s[i] if i < len(mass_flow_kg_s) else 0.0
-        if not (t == t):
+        if math.isnan(t):
             t = 0.0
-        if not (mdot == mdot):
+        if math.isnan(mdot):
             mdot = 0.0
         m_eff = max(m, dry)
         r = math.hypot(x, y)

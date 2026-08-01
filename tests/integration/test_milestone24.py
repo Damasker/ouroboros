@@ -9,7 +9,6 @@ import pytest
 from ouroboros.core import run_simulation
 from ouroboros.io import load_config
 from ouroboros.physics.neutronics_zones import (
-    BlanketLayer,
     default_cad_proxy_layers,
     zone_mc_capture,
 )

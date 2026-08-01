@@ -100,7 +100,7 @@ def make_handler(
             ctype, _ = mimetypes.guess_type(str(path))
             self._send(200, path.read_bytes(), content_type=ctype or "application/octet-stream")
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/") or "/"
             qs = parse_qs(parsed.query)

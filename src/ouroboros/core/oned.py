@@ -504,10 +504,10 @@ class OneDSystem:
             from ouroboros.physics.momentum import (
                 CellPressureForces,
                 cell_grad_p_forces,
-                hlld_energy_flux,
-                hlld_momentum_flux,
                 hllc_energy_flux,
                 hllc_momentum_flux,
+                hlld_energy_flux,
+                hlld_momentum_flux,
                 roe_energy_flux,
                 roe_momentum_flux,
                 rusanov_energy_flux,
@@ -565,15 +565,15 @@ class OneDSystem:
                 face_factors.append(fac)
                 face_speeds.append(u * fac)
 
-            m_kwargs = dict(
-                mesh=mesh,
-                masses_kg=masses,
-                velocities_m_s=vs,
-                pressures_pa=riemann_pressures,
-                face_area_factors=face_factors,
-                pressure_scale=cfg.oned.pressure_force_scale,
-                enabled=True,
-            )
+            m_kwargs = {
+                "mesh": mesh,
+                "masses_kg": masses,
+                "velocities_m_s": vs,
+                "pressures_pa": riemann_pressures,
+                "face_area_factors": face_factors,
+                "pressure_scale": cfg.oned.pressure_force_scale,
+                "enabled": True,
+            }
             if cfg.oned.riemann == "hllc":
                 mflux = hllc_momentum_flux(**m_kwargs)
             elif cfg.oned.riemann == "roe":
@@ -594,17 +594,17 @@ class OneDSystem:
                 )
 
             if use_riemann and cfg.oned.riemann_energy:
-                e_kwargs = dict(
-                    mesh=mesh,
-                    masses_kg=masses,
-                    velocities_m_s=vs,
-                    pressures_pa=riemann_pressures,
-                    internal_energy_j=[float(Us[i]) for i in range(L.n_cells)],
-                    face_area_factors=face_factors,
-                    pressure_scale=cfg.oned.pressure_force_scale,
-                    dv_dt=mflux.dv_dt,
-                    enabled=True,
-                )
+                e_kwargs = {
+                    "mesh": mesh,
+                    "masses_kg": masses,
+                    "velocities_m_s": vs,
+                    "pressures_pa": riemann_pressures,
+                    "internal_energy_j": [float(Us[i]) for i in range(L.n_cells)],
+                    "face_area_factors": face_factors,
+                    "pressure_scale": cfg.oned.pressure_force_scale,
+                    "dv_dt": mflux.dv_dt,
+                    "enabled": True,
+                }
                 if cfg.oned.riemann == "hllc":
                     eflux = hllc_energy_flux(**e_kwargs)
                 elif cfg.oned.riemann == "roe":
