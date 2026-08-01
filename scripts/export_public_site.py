@@ -180,9 +180,10 @@ def build_site(
 """,
         encoding="utf-8",
     )
-    # Write CNAME only when explicitly requested (needs DNS first, else github.io redirects to a dead host)
-    write_cname = os.environ.get("WRITE_CNAME", "0") == "1"
-    if write_cname and domain:
+    # CNAME file helps GitHub Pages issue the custom-domain TLS cert.
+    # Opt out with WRITE_CNAME=0 if DNS is not ready yet (github.io would redirect to a dead host).
+    write_cname = os.environ.get("WRITE_CNAME", "1") != "0"
+    if write_cname and domain and "github.io" not in domain:
         (out / "CNAME").write_text(domain.strip() + "\n", encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     (out / "404.html").write_text(
