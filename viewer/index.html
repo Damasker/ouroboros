@@ -32,11 +32,12 @@
             <select id="run"></select>
           </div>
           <div class="field">
-            <label for="field">Field</label>
+            <label for="field">Color by</label>
             <select id="field">
-              <option value="density">Density</option>
-              <option value="temperature">Temperature</option>
-              <option value="flow_velocity">Flow velocity</option>
+              <option value="density">Density n</option>
+              <option value="temperature">Temperature T</option>
+              <option value="flow_velocity">Flow velocity v</option>
+              <option value="magnetic_field">Magnetic field B</option>
             </select>
           </div>
           <div class="btn-row">
@@ -57,10 +58,22 @@
         </section>
 
         <section class="panel">
+          <h2>How to read</h2>
+          <ul class="howto">
+            <li><strong>Color</strong> = selected field (see bar below)</li>
+            <li><strong>Arrows</strong> = plasma flow direction</li>
+            <li><strong>Beads</strong> = 1D mesh cells (detail ladder)</li>
+            <li><strong>Coils</strong> = magnetic throttles A / B</li>
+            <li>Loop: feeds → branches → chamber → nozzle → return → split</li>
+          </ul>
+        </section>
+
+        <section class="panel">
           <h2>Status</h2>
           <div class="status" id="statusPills">
             <span class="pill" id="pillConn">connecting</span>
             <span class="pill" id="pillFrames">0 frames</span>
+            <span class="pill" id="pillMesh">mesh —</span>
           </div>
           <p class="hints" style="margin-top:0.75rem">
             <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> step · <kbd>F</kbd> cycle field
@@ -72,8 +85,8 @@
 
       <section class="main">
         <div class="stage-wrap">
-          <div class="stage-badge">live schematic</div>
-          <canvas id="c" width="1000" height="560" aria-label="Plasma loop schematic"></canvas>
+          <div class="stage-badge" id="stageBadge">plasma loop</div>
+          <canvas id="c" width="1100" height="640" aria-label="Plasma loop schematic"></canvas>
           <div class="stage-empty" id="empty">
             <div>
               <h3>No snapshots yet</h3>
@@ -83,14 +96,17 @@
         </div>
 
         <div class="legend">
-          <span>low</span>
+          <span id="legendLo">low</span>
           <div class="legend-bar" aria-hidden="true"></div>
-          <span>high</span>
+          <span id="legendHi">high</span>
+          <span class="legend-field" id="legendField">density</span>
         </div>
 
         <div class="telemetry">
           <div class="stat"><div class="k">Time</div><div class="v"><span id="tVal">—</span><em>s</em></div></div>
-          <div class="stat"><div class="k">Segments</div><div class="v" id="nSeg">—</div></div>
+          <div class="stat"><div class="k">Field mean</div><div class="v"><span id="fMean">—</span><em id="fUnit"></em></div></div>
+          <div class="stat"><div class="k">Field range</div><div class="v"><span id="fRange">—</span></div></div>
+          <div class="stat"><div class="k">Mesh cells</div><div class="v" id="nCells">—</div></div>
           <div class="stat"><div class="k">Throttle I<sub>a</sub></div><div class="v"><span id="ia">—</span><em>A</em></div></div>
           <div class="stat"><div class="k">Throttle I<sub>b</sub></div><div class="v"><span id="ib">—</span><em>A</em></div></div>
         </div>
@@ -109,7 +125,37 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { frames: [], geom: null, playing: false, raf: 0, lastTs: 0 };
+    const state = {
+      frames: [],
+      geom: null,
+      runMeta: {},
+      playing: false,
+      raf: 0,
+      lastTs: 0,
+      animPhase: 0,
+    };
+
+    const LABEL = {
+      feed_a: "Feed A",
+      feed_b: "Feed B",
+      branch_a: "Branch A",
+      branch_b: "Branch B",
+      throttle_a: "Throttle A",
+      throttle_b: "Throttle B",
+      reaction_chamber: "Chamber",
+      expansion: "Expansion",
+      separator: "Separator",
+      return_channel: "Return",
+      return_to_split: "To split",
+    };
+
+    const FIELD_META = {
+      density: { unit: "m⁻³", short: "n", fmt: (v) => sci(v) },
+      temperature: { unit: "K", short: "T", fmt: (v) => v.toFixed(1) },
+      flow_velocity: { unit: "m/s", short: "v", fmt: (v) => v.toFixed(2) },
+      magnetic_field: { unit: "T", short: "B", fmt: (v) => sci(v) },
+    };
+
     const apiJSON = (path) =>
       window.OuroborosAPI
         ? OuroborosAPI.apiJSON(path)
@@ -118,15 +164,12 @@
             return r.json();
           });
 
-    const LAYOUT = {
-      branch_a: [[0.18, 0.28], [0.42, 0.18], [0.62, 0.22], [0.78, 0.35]],
-      reaction_chamber: [[0.78, 0.35], [0.84, 0.50], [0.78, 0.65]],
-      branch_b: [[0.78, 0.65], [0.62, 0.78], [0.42, 0.82], [0.18, 0.72]],
-      return_channel: [[0.18, 0.72], [0.12, 0.50], [0.18, 0.28]],
-      expansion_nozzle: [[0.84, 0.50], [0.94, 0.50]],
-      throttle_a: [[0.42, 0.18], [0.50, 0.16]],
-      throttle_b: [[0.42, 0.82], [0.50, 0.84]],
-    };
+    function sci(v) {
+      if (!Number.isFinite(v)) return "—";
+      const a = Math.abs(v);
+      if (a !== 0 && (a < 1e-2 || a >= 1e4)) return v.toExponential(2);
+      return v.toFixed(3);
+    }
 
     function lerp(a, b, t) { return a + (b - a) * t; }
     function hexLerp(c0, c1, t) {
@@ -136,12 +179,89 @@
     }
     function colorMap(t) {
       t = Math.min(1, Math.max(0, t));
-      if (t < 0.5) return hexLerp("#1a8f78", "#c9d6a8", t * 2);
-      return hexLerp("#c9d6a8", "#f0a35e", (t - 0.5) * 2);
+      if (t < 0.33) return hexLerp("#1a5f8f", "#1a8f78", t / 0.33);
+      if (t < 0.66) return hexLerp("#1a8f78", "#c9d6a8", (t - 0.33) / 0.33);
+      return hexLerp("#c9d6a8", "#f0a35e", (t - 0.66) / 0.34);
     }
 
     function setEmpty(on) {
       $("empty").classList.toggle("visible", on);
+    }
+
+    function projectNodes(geom, w, h) {
+      const nodes = geom?.nodes || [];
+      if (!nodes.length) return { map: {}, pad: 48 };
+      const xs = nodes.map((n) => n.x);
+      const ys = nodes.map((n) => n.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const pad = 72;
+      const dx = Math.max(maxX - minX, 1e-6);
+      const dy = Math.max(maxY - minY, 1e-6);
+      const sx = (w - pad * 2) / dx;
+      const sy = (h - pad * 2) / dy;
+      const s = Math.min(sx, sy);
+      const ox = (w - s * dx) / 2;
+      const oy = (h - s * dy) / 2;
+      const map = {};
+      for (const n of nodes) {
+        map[n.id] = {
+          x: ox + (n.x - minX) * s,
+          // Flip Y so geometry +Y is up on screen
+          y: h - (oy + (n.y - minY) * s),
+        };
+      }
+      return { map, pad };
+    }
+
+    function segmentEndpoints(seg, nodeMap) {
+      const a = nodeMap[seg.start_node];
+      const b = nodeMap[seg.end_node];
+      if (!a || !b) return null;
+      return [a, b];
+    }
+
+    function pointOnSeg(a, b, t) {
+      return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
+    }
+
+    function drawArrow(ctx, x, y, ang, size, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(size, 0);
+      ctx.lineTo(-size * 0.7, size * 0.55);
+      ctx.lineTo(-size * 0.35, 0);
+      ctx.lineTo(-size * 0.7, -size * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCoil(ctx, x, y, current, label) {
+      const r = 14 + Math.min(10, Math.abs(current || 0) * 0.04);
+      ctx.save();
+      ctx.strokeStyle = "rgba(240,163,94,0.85)";
+      ctx.fillStyle = "rgba(240,163,94,0.12)";
+      ctx.lineWidth = 2.5;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(x - 6 + i * 6, y, r * 0.55, -0.75 * Math.PI, 0.75 * Math.PI);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f0a35e";
+      ctx.font = "700 11px JetBrains Mono, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(label, x, y - r - 6);
+      ctx.fillStyle = "rgba(232,238,242,0.9)";
+      ctx.font = "600 10px JetBrains Mono, monospace";
+      ctx.fillText(`${Number(current || 0).toFixed(1)} A`, x, y + r + 14);
+      ctx.restore();
     }
 
     async function loadRuns() {
@@ -149,11 +269,24 @@
       const sel = $("run");
       const prev = sel.value;
       sel.innerHTML = "";
+      state.runMeta = {};
       for (const run of data.runs || []) {
+        state.runMeta[run.run_id] = run;
         const opt = document.createElement("option");
         opt.value = run.run_id;
-        const trust = run.energy_trusted === true ? " · trusted" : (run.energy_trusted === false ? " · untrusted" : "");
-        opt.textContent = `${run.run_id} · ${run.n_snapshots ?? "?"} frames${trust}`;
+        const mesh =
+          run.n_cells != null
+            ? ` · ${run.n_cells} cells`
+            : run.cells_per_segment != null
+              ? ` · Nc=${run.cells_per_segment}`
+              : "";
+        const trust =
+          run.energy_trusted === true
+            ? " · trusted"
+            : run.energy_trusted === false
+              ? " · untrusted"
+              : "";
+        opt.textContent = `${run.run_id}${mesh} · ${run.n_snapshots ?? "?"} fr${trust}`;
         sel.appendChild(opt);
       }
       if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
@@ -166,12 +299,18 @@
     }
 
     async function loadGeometry() {
-      try { state.geom = await apiJSON("/geometry"); }
-      catch { state.geom = null; }
+      try {
+        state.geom = await apiJSON("/geometry");
+      } catch {
+        state.geom = null;
+      }
     }
 
     async function loadRun(runId) {
-      if (!runId) { setEmpty(true); return; }
+      if (!runId) {
+        setEmpty(true);
+        return;
+      }
       $("err").textContent = "";
       const data = await apiJSON(`/runs/${encodeURIComponent(runId)}/snapshots`);
       state.frames = data.frames || [];
@@ -180,6 +319,18 @@
       $("frameMax").textContent = `/ ${Math.max(0, state.frames.length - 1)}`;
       $("pillFrames").textContent = `${state.frames.length} frames`;
       $("pillFrames").className = state.frames.length ? "pill ok" : "pill warn";
+      const meta = state.runMeta[runId] || {};
+      const nCells = meta.n_cells;
+      $("pillMesh").textContent =
+        nCells != null
+          ? `mesh ${nCells} cells`
+          : meta.detail_level != null
+            ? `detail L${meta.detail_level}`
+            : "mesh —";
+      $("stageBadge").textContent =
+        meta.detail_level != null
+          ? `detail level ${meta.detail_level} · ${nCells ?? "?"} cells`
+          : "plasma loop · arrows = flow";
       setEmpty(!state.frames.length);
       draw(0);
     }
@@ -190,87 +341,247 @@
       return m;
     }
 
-    function fieldRange(frames, field) {
-      let lo = Infinity, hi = -Infinity;
+    function cellsBySegment(frame) {
+      const m = {};
+      for (const c of frame.cells || []) {
+        const id = c.segment_id;
+        if (!m[id]) m[id] = [];
+        m[id].push(c);
+      }
+      for (const id of Object.keys(m)) {
+        m[id].sort((a, b) => (a.local_index ?? 0) - (b.local_index ?? 0));
+      }
+      return m;
+    }
+
+    function fieldSamples(frames, field) {
+      const vals = [];
       for (const f of frames) {
         for (const s of f.segments || []) {
           const v = Number(s[field]);
-          if (!Number.isFinite(v)) continue;
-          lo = Math.min(lo, v); hi = Math.max(hi, v);
+          if (Number.isFinite(v)) vals.push(v);
+        }
+        for (const c of f.cells || []) {
+          const v = Number(c[field]);
+          if (Number.isFinite(v)) vals.push(v);
         }
       }
-      if (!Number.isFinite(lo)) return [0, 1];
+      return vals;
+    }
+
+    function fieldRange(frames, field) {
+      const vals = fieldSamples(frames, field);
+      if (!vals.length) return [0, 1];
+      let lo = Math.min(...vals);
+      let hi = Math.max(...vals);
       if (hi <= lo) hi = lo + 1;
       return [lo, hi];
     }
 
-    function drawPolyline(ctx, pts, w, h, color, width) {
-      if (pts.length < 2) return;
+    function drawRoundedTube(ctx, a, b, width, color) {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x);
+      const dx = Math.cos(ang);
+      const dy = Math.sin(ang);
+      const nx = -dy;
+      const ny = dx;
+      const hw = width / 2;
       ctx.beginPath();
-      ctx.moveTo(pts[0][0] * w, pts[0][1] * h);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * w, pts[i][1] * h);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
+      ctx.moveTo(a.x + nx * hw, a.y + ny * hw);
+      ctx.lineTo(b.x + nx * hw, b.y + ny * hw);
+      ctx.arc(b.x, b.y, hw, ang - Math.PI / 2, ang + Math.PI / 2);
+      ctx.lineTo(a.x - nx * hw, a.y - ny * hw);
+      ctx.arc(a.x, a.y, hw, ang + Math.PI / 2, ang - Math.PI / 2);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
     }
 
     function draw(idx) {
       const canvas = $("c");
       const ctx = canvas.getContext("2d");
-      const w = canvas.width, h = canvas.height;
+      const w = canvas.width;
+      const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // atmosphere
-      const g = ctx.createRadialGradient(w * 0.72, h * 0.48, 20, w * 0.55, h * 0.5, w * 0.55);
-      g.addColorStop(0, "rgba(62,240,200,0.08)");
+      // Atmosphere
+      const g = ctx.createRadialGradient(w * 0.55, h * 0.42, 30, w * 0.5, h * 0.5, w * 0.6);
+      g.addColorStop(0, "rgba(62,240,200,0.07)");
       g.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = "rgba(232,238,242,0.04)";
-      ctx.lineWidth = 1;
-      for (let x = 40; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-      for (let y = 40; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-
       const frame = state.frames[idx];
       $("frameLabel").textContent = String(idx);
-      if (!frame) {
+      if (!frame || !state.geom) {
         $("tVal").textContent = "—";
-        return;
+        if (!frame) return;
       }
+
       const field = $("field").value;
+      const meta = FIELD_META[field] || FIELD_META.density;
       const [lo, hi] = fieldRange(state.frames, field);
       const segs = segmentMap(frame);
+      const cellMap = cellsBySegment(frame);
+      const { map: nodeMap } = projectNodes(state.geom, w, h);
+      const geomSegs = state.geom.segments || [];
 
-      for (const pts of Object.values(LAYOUT)) {
-        drawPolyline(ctx, pts, w, h, "rgba(232,238,242,0.08)", 22);
+      // Ghost tracks
+      for (const seg of geomSegs) {
+        const ends = segmentEndpoints(seg, nodeMap);
+        if (!ends) continue;
+        drawRoundedTube(ctx, ends[0], ends[1], 22, "rgba(232,238,242,0.06)");
       }
-      for (const [id, pts] of Object.entries(LAYOUT)) {
-        const s = segs[id];
-        let col = "rgba(138,154,166,0.45)";
-        if (s && Number.isFinite(Number(s[field]))) {
-          col = colorMap((Number(s[field]) - lo) / (hi - lo));
+
+      // Colored segments / cells
+      for (const seg of geomSegs) {
+        const ends = segmentEndpoints(seg, nodeMap);
+        if (!ends) continue;
+        const [a, b] = ends;
+        const cells = cellMap[seg.id];
+        const s = segs[seg.id];
+        const isThrottle = seg.element_type === "throttle" || seg.id.startsWith("throttle_");
+        const isChamber = seg.element_type === "chamber" || seg.id === "reaction_chamber";
+        const baseW = isChamber ? 26 : isThrottle ? 16 : 14;
+
+        if (cells && cells.length) {
+          const n = cells.length;
+          for (let i = 0; i < n; i++) {
+            const t0 = i / n;
+            const t1 = (i + 1) / n;
+            const p0 = pointOnSeg(a, b, t0);
+            const p1 = pointOnSeg(a, b, t1);
+            const v = Number(cells[i][field]);
+            const col = Number.isFinite(v)
+              ? colorMap((v - lo) / (hi - lo))
+              : "rgba(138,154,166,0.4)";
+            drawRoundedTube(ctx, p0, p1, baseW, col);
+            // cell separators
+            ctx.strokeStyle = "rgba(7,11,14,0.35)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.stroke();
+          }
+        } else {
+          let col = "rgba(138,154,166,0.45)";
+          if (s && Number.isFinite(Number(s[field]))) {
+            col = colorMap((Number(s[field]) - lo) / (hi - lo));
+          }
+          drawRoundedTube(ctx, a, b, baseW, col);
         }
-        drawPolyline(ctx, pts, w, h, col, id.includes("throttle") ? 10 : 15);
+
+        // Flow arrows from segment (or cell-average) velocity
+        let vel = Number(s?.flow_velocity);
+        if (!Number.isFinite(vel) && cells?.length) {
+          const vs = cells.map((c) => Number(c.flow_velocity)).filter(Number.isFinite);
+          vel = vs.length ? vs.reduce((p, q) => p + q, 0) / vs.length : 0;
+        }
+        if (!Number.isFinite(vel)) vel = 0;
+        const ang = Math.atan2(b.y - a.y, b.x - a.x) + (vel < 0 ? Math.PI : 0);
+        const speed = Math.min(1, Math.abs(vel) / Math.max(hi - lo, Math.abs(vel), 1));
+        const nArrows = 1 + (isChamber ? 1 : 0);
+        for (let k = 0; k < nArrows; k++) {
+          const t = (0.35 + k * 0.25 + state.animPhase * 0.15 * (vel >= 0 ? 1 : -1) + 1) % 1;
+          const p = pointOnSeg(a, b, t);
+          const alpha = 0.35 + 0.5 * speed;
+          drawArrow(ctx, p.x, p.y, ang, 7 + 3 * speed, `rgba(232,238,242,${alpha})`);
+        }
       }
 
-      ctx.fillStyle = "rgba(232,238,242,0.55)";
-      ctx.font = "600 12px JetBrains Mono, monospace";
-      for (const [txt, x, y] of [
-        ["branch_a", 0.38, 0.12],
-        ["branch_b", 0.38, 0.92],
-        ["chamber", 0.78, 0.48],
-        ["return", 0.04, 0.50],
-        ["nozzle", 0.90, 0.42],
-      ]) ctx.fillText(txt, x * w, y * h);
+      // Nodes
+      for (const [id, p] of Object.entries(nodeMap)) {
+        ctx.beginPath();
+        ctx.fillStyle = "rgba(232,238,242,0.85)";
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(62,240,200,0.5)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
 
+      // Throttle coils
       const comps = Object.fromEntries((frame.components || []).map((c) => [c.id, c]));
+      const ta = nodeMap.a_throttle;
+      const tb = nodeMap.b_throttle;
+      if (ta) drawCoil(ctx, ta.x, ta.y - 28, comps.throttle_a?.current, "Ia");
+      if (tb) drawCoil(ctx, tb.x, tb.y + 28, comps.throttle_b?.current, "Ib");
+
+      // Chamber halo
+      const cin = nodeMap.chamber_in;
+      const cout = nodeMap.chamber_out;
+      if (cin && cout) {
+        const cx = (cin.x + cout.x) / 2;
+        const cy = (cin.y + cout.y) / 2;
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(62,240,200,0.35)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Labels with live values (offset from midpoints)
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const seg of geomSegs) {
+        const ends = segmentEndpoints(seg, nodeMap);
+        if (!ends) continue;
+        const mid = pointOnSeg(ends[0], ends[1], 0.5);
+        const s = segs[seg.id];
+        const v = s ? Number(s[field]) : NaN;
+        const title = LABEL[seg.id] || seg.id;
+        const ang = Math.atan2(ends[1].y - ends[0].y, ends[1].x - ends[0].x);
+        const nx = -Math.sin(ang);
+        const ny = Math.cos(ang);
+        // Push labels outward from loop center
+        const cx = w / 2, cy = h / 2;
+        const outward = (mid.x - cx) * nx + (mid.y - cy) * ny >= 0 ? 1 : -1;
+        const lx = mid.x + nx * 22 * outward;
+        const ly = mid.y + ny * 22 * outward;
+
+        ctx.fillStyle = "rgba(7,11,14,0.72)";
+        const boxW = 86;
+        const boxH = 28;
+        ctx.fillRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH);
+        ctx.strokeStyle = "rgba(120,160,180,0.25)";
+        ctx.strokeRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH);
+
+        ctx.fillStyle = "rgba(232,238,242,0.92)";
+        ctx.font = "700 10px JetBrains Mono, monospace";
+        ctx.fillText(title, lx, ly - 6);
+        ctx.fillStyle = "rgba(62,240,200,0.95)";
+        ctx.font = "600 10px JetBrains Mono, monospace";
+        ctx.fillText(Number.isFinite(v) ? meta.fmt(v) : "—", lx, ly + 8);
+      }
+
+      // Title card on canvas
+      ctx.fillStyle = "rgba(7,11,14,0.55)";
+      ctx.fillRect(16, h - 58, 320, 42);
+      ctx.fillStyle = "rgba(232,238,242,0.7)";
+      ctx.font = "600 11px JetBrains Mono, monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("Circulation: split → feeds → throttles → chamber", 26, h - 40);
+      ctx.fillText("→ expansion → separator → return → split", 26, h - 22);
+
+      // Telemetry
+      const vals = [];
+      for (const s of frame.segments || []) {
+        const v = Number(s[field]);
+        if (Number.isFinite(v)) vals.push(v);
+      }
+      const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : NaN;
       $("tVal").textContent = Number(frame.time).toFixed(4);
-      $("nSeg").textContent = String((frame.segments || []).length);
+      $("fMean").textContent = Number.isFinite(mean) ? meta.fmt(mean) : "—";
+      $("fUnit").textContent = meta.unit;
+      $("fRange").textContent = `${meta.fmt(lo)} → ${meta.fmt(hi)}`;
+      $("nCells").textContent = String((frame.cells || []).length || "—");
       $("ia").textContent = comps.throttle_a ? Number(comps.throttle_a.current).toFixed(3) : "—";
       $("ib").textContent = comps.throttle_b ? Number(comps.throttle_b.current).toFixed(3) : "—";
+      $("legendLo").textContent = meta.fmt(lo);
+      $("legendHi").textContent = meta.fmt(hi);
+      $("legendField").textContent = `${meta.short} (${meta.unit})`;
     }
 
     function setPlaying(on) {
@@ -282,12 +593,15 @@
 
     function tick(ts) {
       if (!state.playing) return;
-      if (ts - state.lastTs > 80) {
+      state.animPhase = (state.animPhase + 0.04) % 1;
+      if (ts - state.lastTs > 90) {
         state.lastTs = ts;
         let i = Number($("frame").value) + 1;
         if (i >= state.frames.length) i = 0;
         $("frame").value = i;
         draw(i);
+      } else {
+        draw(Number($("frame").value));
       }
       state.raf = requestAnimationFrame(tick);
     }
@@ -319,10 +633,22 @@
 
     window.addEventListener("keydown", (e) => {
       if (e.target.matches("input, select, textarea")) return;
-      if (e.code === "Space") { e.preventDefault(); setPlaying(!state.playing); }
-      if (e.code === "ArrowRight") { e.preventDefault(); step(1); }
-      if (e.code === "ArrowLeft") { e.preventDefault(); step(-1); }
-      if (e.key === "f" || e.key === "F") { e.preventDefault(); cycleField(); }
+      if (e.code === "Space") {
+        e.preventDefault();
+        setPlaying(!state.playing);
+      }
+      if (e.code === "ArrowRight") {
+        e.preventDefault();
+        step(1);
+      }
+      if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        step(-1);
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        cycleField();
+      }
     });
 
     (async () => {
