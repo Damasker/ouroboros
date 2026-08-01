@@ -22,6 +22,11 @@ DEMO_SCENARIOS = (
     "dt-blanket-zones",
 )
 
+# Progressive mesh refinement gallery: one run per cells_per_segment level.
+DETAIL_BASE_SCENARIO = "oned-hlld"
+DETAIL_LEVELS = 18
+N_GEOMETRY_SEGMENTS = 11
+
 
 def _read_jsonl(path: Path) -> list[dict]:
     frames: list[dict] = []
@@ -78,6 +83,45 @@ def export_run_static(run_dir: Path, out_run: Path) -> dict:
     return entry
 
 
+def _run_detail_ladder(root: Path, results: Path, *, levels: int = DETAIL_LEVELS) -> None:
+    """Run oned-hlld once per mesh level: cells_per_segment = 1 … levels."""
+    from ouroboros.cli import SCENARIO_CONFIGS
+
+    base_path = root / SCENARIO_CONFIGS[DETAIL_BASE_SCENARIO]
+    for level in range(1, levels + 1):
+        cfg = load_config(base_path)
+        cfg.simulation.duration_s = min(float(cfg.simulation.duration_s), 0.12)
+        cfg.simulation.output_interval_s = min(
+            float(cfg.simulation.output_interval_s), 0.01
+        )
+        cfg.numerics.max_nfev = max(int(cfg.numerics.max_nfev), 250000)
+        cfg.oned.cells_per_segment = level
+        cfg.oned.export_cells_in_snapshot = True
+        run_id = f"detail-{level:02d}"
+        print(
+            f"detail ladder {level}/{levels}: "
+            f"cells_per_segment={level} → ~{level * N_GEOMETRY_SEGMENTS} cells"
+        )
+        result = run_simulation(cfg, run_id=run_id)
+        write_run_directory(result, results)
+
+
+def _run_classic_demos(root: Path, results: Path, scenarios: tuple[str, ...]) -> None:
+    from ouroboros.cli import SCENARIO_CONFIGS
+
+    for sc in scenarios:
+        cfg = load_config(root / SCENARIO_CONFIGS[sc])
+        cfg.simulation.duration_s = min(float(cfg.simulation.duration_s), 0.12)
+        cfg.simulation.output_interval_s = min(
+            float(cfg.simulation.output_interval_s), 0.02
+        )
+        # Keep classic demos light for Pages size.
+        if cfg.simulation.model == "oned" and cfg.oned.cells_per_segment > 2:
+            cfg.oned.cells_per_segment = 2
+        result = run_simulation(cfg, run_id=sc)
+        write_run_directory(result, results)
+
+
 def build_site(
     root: Path,
     *,
@@ -85,6 +129,8 @@ def build_site(
     domain: str,
     scenarios: tuple[str, ...] = DEMO_SCENARIOS,
     skip_run: bool = False,
+    detail_levels: int = DETAIL_LEVELS,
+    classic_demos: bool = False,
 ) -> Path:
     root = root.resolve()
     out = out.resolve()
@@ -101,18 +147,10 @@ def build_site(
         if results.exists():
             shutil.rmtree(results)
         results.mkdir(parents=True)
-        from ouroboros.cli import SCENARIO_CONFIGS
-
-        for sc in scenarios:
-            cfg = load_config(root / SCENARIO_CONFIGS[sc])
-            cfg.simulation.duration_s = min(float(cfg.simulation.duration_s), 0.12)
-            cfg.simulation.output_interval_s = min(
-                float(cfg.simulation.output_interval_s), 0.02
-            )
-            if cfg.simulation.model == "oned" and cfg.oned.cells_per_segment > 2:
-                cfg.oned.cells_per_segment = 2
-            result = run_simulation(cfg, run_id=sc)
-            write_run_directory(result, results)
+        if classic_demos:
+            _run_classic_demos(root, results, scenarios)
+        else:
+            _run_detail_ladder(root, results, levels=detail_levels)
     elif not results.exists():
         raise SystemExit("No results/_public_demo — run without --skip-run first")
 
@@ -123,7 +161,19 @@ def build_site(
     catalog: list[dict] = []
     for run_dir in sorted(results.iterdir()):
         if run_dir.is_dir():
-            catalog.append(export_run_static(run_dir, runs_out / run_dir.name))
+            entry = export_run_static(run_dir, runs_out / run_dir.name)
+            # Annotate detail ladder runs for UI / API consumers.
+            name = run_dir.name
+            if name.startswith("detail-"):
+                try:
+                    level = int(name.split("-", 1)[1])
+                except ValueError:
+                    level = None
+                if level is not None:
+                    entry["detail_level"] = level
+                    entry["cells_per_segment"] = level
+                    entry["n_cells"] = level * N_GEOMETRY_SEGMENTS
+            catalog.append(entry)
 
     (data / "runs.json").write_text(
         json.dumps({"runs": catalog}, indent=2) + "\n", encoding="utf-8"
@@ -200,9 +250,25 @@ def main() -> int:
     p.add_argument("--out", default="site")
     p.add_argument("--domain", default="ouroboros.beart.cc")
     p.add_argument("--skip-run", action="store_true")
+    p.add_argument(
+        "--classic-demos",
+        action="store_true",
+        help="Export the five classic demos instead of the 18-level detail ladder",
+    )
+    p.add_argument(
+        "--detail-levels",
+        type=int,
+        default=DETAIL_LEVELS,
+        help="Number of progressive mesh levels (default 18)",
+    )
     args = p.parse_args()
     build_site(
-        Path(args.root), out=Path(args.out), domain=args.domain, skip_run=args.skip_run
+        Path(args.root),
+        out=Path(args.out),
+        domain=args.domain,
+        skip_run=args.skip_run,
+        detail_levels=max(1, int(args.detail_levels)),
+        classic_demos=bool(args.classic_demos),
     )
     return 0
 

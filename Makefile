@@ -1,10 +1,11 @@
-.PHONY: setup test lint typecheck run-scenario visualize report campaign serve demo geometry clean
+.PHONY: setup test lint typecheck run-scenario visualize report campaign detail-sweep serve demo geometry clean publish-site
 
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 SCENARIO ?= passive
 RUN ?=
 CAMPAIGN ?= configs/campaigns/heater_sweep.yaml
+DETAIL_CAMPAIGN ?= configs/campaigns/detail_sweep.yaml
 HOST ?= 127.0.0.1
 PORT ?= 8765
 
@@ -35,6 +36,10 @@ report:
 
 campaign:
 	$(PYTHON) -m ouroboros.cli --root . campaign --campaign $(CAMPAIGN)
+
+# 18 progressive mesh refinements: cells_per_segment = 1 … 18
+detail-sweep:
+	$(PYTHON) -m ouroboros.cli --root . campaign --campaign $(DETAIL_CAMPAIGN)
 
 serve:
 	$(PYTHON) -m ouroboros.cli --root . serve --host $(HOST) --port $(PORT)

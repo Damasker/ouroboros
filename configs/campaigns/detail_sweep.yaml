@@ -1,0 +1,13 @@
+# Progressive 1D mesh refinement: cells_per_segment = 1 … 18
+# Each case adds one cell per geometry segment (11 → 198 total cells).
+name: detail_sweep
+base_config: configs/oned_hlld.yaml
+output_dir: results/campaigns/detail_sweep
+overrides:
+  simulation.duration_s: 0.12
+  simulation.output_interval_s: 0.01
+  numerics.max_nfev: 250000
+  oned.export_cells_in_snapshot: true
+parameters:
+  - path: oned.cells_per_segment
+    values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]

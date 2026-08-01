@@ -78,6 +78,7 @@ App UI (after `make serve`):
 Keyboard in schematic: `Space` play/pause, `←`/`→` step frames, `F` cycle field.
 
 **Public site:** [https://ouroboros.beart.cc](https://ouroboros.beart.cc) (GitHub Pages gallery + static data API).  
+Gallery default: **18 progressive detail runs** (`detail-01` … `detail-18`) — each level adds one 1D cell per loop segment (11 → 198 cells). Classic five-demo set: `make publish-site` with `--classic-demos`.  
 Deploy notes: [docs/deploy.md](docs/deploy.md).
 
 ```bash
@@ -93,6 +94,7 @@ Fault examples: `fault-block-a`, `fault-quench`, `fault-heater-trip`, `fault-hel
 
 ```bash
 make campaign CAMPAIGN=configs/campaigns/heater_sweep.yaml
+make detail-sweep   # cells_per_segment = 1 … 18 on oned-hlld
 make serve HOST=127.0.0.1 PORT=8765
 ```
 
