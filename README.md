@@ -77,8 +77,8 @@ App UI (after `make serve`):
 
 Keyboard in schematic: `Space` play/pause, `←`/`→` step frames, `F` cycle field.
 
-**Public site:** [https://damasker.github.io/ouroboros/](https://damasker.github.io/ouroboros/) (GitHub Pages gallery).  
-Custom domain **ouroboros.beart.cc** — add Cloudflare CNAME (see [docs/deploy.md](docs/deploy.md)).
+**Public site:** [https://ouroboros.beart.cc](https://ouroboros.beart.cc) (GitHub Pages gallery + static data API).  
+Deploy notes: [docs/deploy.md](docs/deploy.md).
 
 ```bash
 make publish-site DOMAIN=ouroboros.beart.cc

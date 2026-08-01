@@ -7,8 +7,8 @@ Live API remains available via Docker.
 
 | URL | Status |
 |-----|--------|
-| https://damasker.github.io/ouroboros/ | Works after Pages deploy (no DNS needed) |
-| https://ouroboros.beart.cc/ | Needs Cloudflare DNS CNAME (below) |
+| https://ouroboros.beart.cc/ | **Primary** — Cloudflare CNAME → `damasker.github.io` (DNS only) |
+| https://damasker.github.io/ouroboros/ | Redirects to custom domain once Pages `cname` is set |
 
 Repo: https://github.com/Damasker/ouroboros
 
