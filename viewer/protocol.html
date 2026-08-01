@@ -35,7 +35,8 @@
           </p>
           <div class="btn-row">
             <button id="reload" type="button">Reload</button>
-            <a href="/client/protocol" style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+            <a id="rawJson" data-api-href="/client/protocol" target="_blank" rel="noopener"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none">
               <button class="primary" type="button" style="width:100%">Raw JSON</button>
             </a>
           </div>
@@ -100,6 +101,7 @@
     }
 
     $("reload").onclick = load;
+    if (window.OuroborosAPI?.bindStaticLinks) OuroborosAPI.bindStaticLinks();
     load();
   </script>
 </body>

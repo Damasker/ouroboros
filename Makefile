@@ -21,7 +21,7 @@ lint:
 	$(PYTHON) -m ruff check src tests
 
 typecheck:
-	$(PYTHON) -m mypy src/ouroboros || true
+	$(PYTHON) -m mypy src/ouroboros
 
 run-scenario:
 	$(PYTHON) -m ouroboros.cli --root . run --scenario $(SCENARIO) --run-id $(SCENARIO)

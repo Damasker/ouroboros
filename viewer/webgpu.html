@@ -98,7 +98,7 @@
 
     <footer class="footer">
       <span>Ouroboros plasma loop</span>
-      <span><a href="./">schematic</a> · <a href="/client/protocol">protocol</a></span>
+      <span><a href="./">schematic</a> · <a data-api-href="/client/protocol">protocol</a></span>
     </footer>
   </div>
 
@@ -377,6 +377,7 @@ struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f }
 
     (async () => {
       try {
+        if (window.OuroborosAPI?.bindStaticLinks) OuroborosAPI.bindStaticLinks();
         state.gpu = await initGPU();
         if (!state.gpu) $("err").textContent = "WebGPU unavailable — using canvas fallback.";
         await loadRuns();

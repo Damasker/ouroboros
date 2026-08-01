@@ -44,7 +44,7 @@ def bremsstrahlung_power_w(
     if n_e_m3 <= 0.0 or t_e_k <= 0.0 or volume_m3 <= 0.0:
         return 0.0
     t_ev = t_e_k * BOLTZMANN_J_PER_K / ELEMENTARY_CHARGE_C
-    return 1.69e-38 * (n_e_m3**2) * (t_ev**0.5) * z_eff * volume_m3
+    return float(1.69e-38 * (n_e_m3**2) * (t_ev**0.5) * z_eff * volume_m3)
 
 
 def transport_power_w(internal_energy_j: float, tau_e_s: float, confinement_factor: float) -> float:

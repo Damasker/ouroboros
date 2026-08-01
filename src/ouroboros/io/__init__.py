@@ -224,7 +224,7 @@ def export_client_stream_jsonl(result: SimulationResult, path: str | Path) -> No
     path = Path(path)
     final_segs = result.metadata.get("final_zone_segments")
     final_cells = result.metadata.get("final_cells")
-    frames: list[dict] = []
+    frames: list[dict[str, Any]] = []
     for i, t in enumerate(result.times_s):
         sample = {k: result.series[k][i] for k in result.series}
         segs = _segments_from_sample(sample)

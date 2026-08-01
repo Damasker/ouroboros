@@ -28,6 +28,11 @@ DETAIL_LEVELS = 18
 N_GEOMETRY_SEGMENTS = 11
 
 
+def _dumps(obj: object) -> str:
+    """Compact JSON for Pages bandwidth."""
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+
 def _read_jsonl(path: Path) -> list[dict]:
     frames: list[dict] = []
     if not path.exists():
@@ -44,20 +49,16 @@ def export_run_static(run_dir: Path, out_run: Path) -> dict:
     out_run.mkdir(parents=True, exist_ok=True)
     frames = _read_jsonl(run_dir / "snapshots.jsonl")
     (out_run / "snapshots.json").write_text(
-        json.dumps({"run_id": run_dir.name, "offset": 0, "frames": frames}, indent=2) + "\n",
+        _dumps({"run_id": run_dir.name, "offset": 0, "frames": frames}) + "\n",
         encoding="utf-8",
     )
     if frames:
-        (out_run / "latest.json").write_text(
-            json.dumps(frames[-1], indent=2) + "\n", encoding="utf-8"
-        )
+        (out_run / "latest.json").write_text(_dumps(frames[-1]) + "\n", encoding="utf-8")
     energy = run_dir / "energy_report.json"
     entry: dict = {"run_id": run_dir.name, "n_snapshots": len(frames)}
     if energy.exists():
         er = json.loads(energy.read_text(encoding="utf-8"))
-        (out_run / "energy.json").write_text(
-            json.dumps(er, indent=2) + "\n", encoding="utf-8"
-        )
+        (out_run / "energy.json").write_text(_dumps(er) + "\n", encoding="utf-8")
         entry["energy_trusted"] = er.get("energy_trusted")
         entry["relative_residual"] = (er.get("ledger") or {}).get("relative_residual")
     meta: dict = {"run_id": run_dir.name}
@@ -65,17 +66,16 @@ def export_run_static(run_dir: Path, out_run: Path) -> dict:
         fp = run_dir / name
         if fp.exists():
             meta[name.replace(".json", "")] = json.loads(fp.read_text(encoding="utf-8"))
-    (out_run / "meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    (out_run / "meta.json").write_text(_dumps(meta) + "\n", encoding="utf-8")
     stream = run_dir / "client_stream.jsonl"
     if stream.exists():
         (out_run / "client-stream.json").write_text(
-            json.dumps(
+            _dumps(
                 {
                     "run_id": run_dir.name,
                     "protocol": "ouroboros.client",
                     "frames": _read_jsonl(stream),
-                },
-                indent=2,
+                }
             )
             + "\n",
             encoding="utf-8",
@@ -118,6 +118,7 @@ def _run_classic_demos(root: Path, results: Path, scenarios: tuple[str, ...]) ->
         # Keep classic demos light for Pages size.
         if cfg.simulation.model == "oned" and cfg.oned.cells_per_segment > 2:
             cfg.oned.cells_per_segment = 2
+        print(f"classic demo: {sc}")
         result = run_simulation(cfg, run_id=sc)
         write_run_directory(result, results)
 
@@ -130,7 +131,8 @@ def build_site(
     scenarios: tuple[str, ...] = DEMO_SCENARIOS,
     skip_run: bool = False,
     detail_levels: int = DETAIL_LEVELS,
-    classic_demos: bool = False,
+    classic_demos: bool = True,
+    detail_ladder: bool = True,
 ) -> Path:
     root = root.resolve()
     out = out.resolve()
@@ -147,10 +149,12 @@ def build_site(
         if results.exists():
             shutil.rmtree(results)
         results.mkdir(parents=True)
+        if detail_ladder:
+            _run_detail_ladder(root, results, levels=detail_levels)
         if classic_demos:
             _run_classic_demos(root, results, scenarios)
-        else:
-            _run_detail_ladder(root, results, levels=detail_levels)
+        if not detail_ladder and not classic_demos:
+            raise SystemExit("Nothing to export: enable --detail-ladder and/or --classic-demos")
     elif not results.exists():
         raise SystemExit("No results/_public_demo — run without --skip-run first")
 
@@ -162,7 +166,6 @@ def build_site(
     for run_dir in sorted(results.iterdir()):
         if run_dir.is_dir():
             entry = export_run_static(run_dir, runs_out / run_dir.name)
-            # Annotate detail ladder runs for UI / API consumers.
             name = run_dir.name
             if name.startswith("detail-"):
                 try:
@@ -175,26 +178,28 @@ def build_site(
                     entry["n_cells"] = level * N_GEOMETRY_SEGMENTS
             catalog.append(entry)
 
-    (data / "runs.json").write_text(
-        json.dumps({"runs": catalog}, indent=2) + "\n", encoding="utf-8"
-    )
+    (data / "runs.json").write_text(_dumps({"runs": catalog}) + "\n", encoding="utf-8")
     shutil.copyfile(geom_path, data / "geometry.json")
+    # Re-minify geometry if it was pretty-printed on disk.
+    try:
+        geom_obj = json.loads((data / "geometry.json").read_text(encoding="utf-8"))
+        (data / "geometry.json").write_text(_dumps(geom_obj) + "\n", encoding="utf-8")
+    except json.JSONDecodeError:
+        pass
     (data / "health.json").write_text(
-        json.dumps(
-            {"status": "ok", "mode": "static", "domain": domain, "n_runs": len(catalog)},
-            indent=2,
+        _dumps(
+            {"status": "ok", "mode": "static", "domain": domain, "n_runs": len(catalog)}
         )
         + "\n",
         encoding="utf-8",
     )
     (data / "client").mkdir()
     (data / "client" / "protocol.json").write_text(
-        json.dumps(protocol_manifest(), indent=2) + "\n", encoding="utf-8"
+        _dumps(protocol_manifest()) + "\n", encoding="utf-8"
     )
 
     viewer_dst = out / "viewer"
     shutil.copytree(root / "viewer", viewer_dst)
-    # Resolve /data relative to site root whether on custom domain or /repo/ project Pages
     (viewer_dst / "config.js").write_text(
         """(function () {
   var path = location.pathname || '/';
@@ -230,8 +235,6 @@ def build_site(
 """,
         encoding="utf-8",
     )
-    # CNAME file helps GitHub Pages issue the custom-domain TLS cert.
-    # Opt out with WRITE_CNAME=0 if DNS is not ready yet (github.io would redirect to a dead host).
     write_cname = os.environ.get("WRITE_CNAME", "1") != "0"
     if write_cname and domain and "github.io" not in domain:
         (out / "CNAME").write_text(domain.strip() + "\n", encoding="utf-8")
@@ -252,8 +255,15 @@ def main() -> int:
     p.add_argument("--skip-run", action="store_true")
     p.add_argument(
         "--classic-demos",
-        action="store_true",
-        help="Export the five classic demos instead of the 18-level detail ladder",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include the five classic demos (default: on)",
+    )
+    p.add_argument(
+        "--detail-ladder",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include detail-01…detail-N mesh ladder (default: on)",
     )
     p.add_argument(
         "--detail-levels",
@@ -269,6 +279,7 @@ def main() -> int:
         skip_run=args.skip_run,
         detail_levels=max(1, int(args.detail_levels)),
         classic_demos=bool(args.classic_demos),
+        detail_ladder=bool(args.detail_ladder),
     )
     return 0
 

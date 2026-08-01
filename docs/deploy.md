@@ -45,8 +45,8 @@ WRITE_CNAME=1 make publish-site DOMAIN=ouroboros.beart.cc
 
 ## 2. Local static build
 
-Default export builds the **detail ladder** (`detail-01` … `detail-18`, `oned.cells_per_segment` = 1…18).  
-Classic demos: `python scripts/export_public_site.py --classic-demos`.
+Default export builds **both** the detail ladder (`detail-01` … `detail-18`) and the five classic demos.  
+Disable either set with `--no-detail-ladder` / `--no-classic-demos`. Reuse cached runs with `--skip-run`.
 
 ```bash
 make publish-site DOMAIN=ouroboros.beart.cc

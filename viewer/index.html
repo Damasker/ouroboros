@@ -40,6 +40,16 @@
               <option value="magnetic_field">Magnetic field B</option>
             </select>
           </div>
+          <div class="field">
+            <label for="speed">Play speed</label>
+            <select id="speed">
+              <option value="240">0.25×</option>
+              <option value="160">0.5×</option>
+              <option value="90" selected>1×</option>
+              <option value="45">2×</option>
+              <option value="20">4×</option>
+            </select>
+          </div>
           <div class="btn-row">
             <button id="reload" type="button">Reload</button>
             <button id="play" class="primary" type="button">Play</button>
@@ -74,6 +84,7 @@
             <span class="pill" id="pillConn">connecting</span>
             <span class="pill" id="pillFrames">0 frames</span>
             <span class="pill" id="pillMesh">mesh —</span>
+            <span class="pill" id="pillTrust">energy —</span>
           </div>
           <p class="hints" style="margin-top:0.75rem">
             <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> step · <kbd>F</kbd> cycle field
@@ -107,8 +118,8 @@
           <div class="stat"><div class="k">Field mean</div><div class="v"><span id="fMean">—</span><em id="fUnit"></em></div></div>
           <div class="stat"><div class="k">Field range</div><div class="v"><span id="fRange">—</span></div></div>
           <div class="stat"><div class="k">Mesh cells</div><div class="v" id="nCells">—</div></div>
-          <div class="stat"><div class="k">Throttle I<sub>a</sub></div><div class="v"><span id="ia">—</span><em>A</em></div></div>
-          <div class="stat"><div class="k">Throttle I<sub>b</sub></div><div class="v"><span id="ib">—</span><em>A</em></div></div>
+          <div class="stat"><div class="k">Energy residual</div><div class="v"><span id="eResid">—</span></div></div>
+          <div class="stat"><div class="k">Throttle I<sub>a</sub> / I<sub>b</sub></div><div class="v"><span id="ia">—</span><em>A</em> · <span id="ib">—</span><em>A</em></div></div>
         </div>
       </section>
     </div>
@@ -116,9 +127,9 @@
     <footer class="footer">
       <span>Ouroboros plasma loop</span>
       <span>
-        <a href="/health">/health</a> ·
-        <a href="/runs">/runs</a> ·
-        <a href="/geometry">/geometry</a>
+        <a data-api-href="/health">/health</a> ·
+        <a data-api-href="/runs">/runs</a> ·
+        <a data-api-href="/geometry">/geometry</a>
       </span>
     </footer>
   </div>
@@ -134,6 +145,29 @@
       lastTs: 0,
       animPhase: 0,
     };
+
+    function playIntervalMs() {
+      const v = Number($("speed")?.value);
+      return Number.isFinite(v) && v > 0 ? v : 90;
+    }
+
+    function readQuery() {
+      const q = new URLSearchParams(location.search);
+      return {
+        run: q.get("run") || "",
+        frame: q.has("frame") ? Number(q.get("frame")) : null,
+        field: q.get("field") || "",
+      };
+    }
+
+    function writeQuery() {
+      const q = new URLSearchParams();
+      if ($("run").value) q.set("run", $("run").value);
+      q.set("frame", String($("frame").value || 0));
+      if ($("field").value) q.set("field", $("field").value);
+      const qs = q.toString();
+      history.replaceState(null, "", qs ? `?${qs}` : location.pathname);
+    }
 
     const LABEL = {
       feed_a: "Feed A",
@@ -289,7 +323,12 @@
         opt.textContent = `${run.run_id}${mesh} · ${run.n_snapshots ?? "?"} fr${trust}`;
         sel.appendChild(opt);
       }
-      if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+      const q = readQuery();
+      if (q.run && [...sel.options].some((o) => o.value === q.run)) sel.value = q.run;
+      else if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+      if (q.field && [...$("field").options].some((o) => o.value === q.field)) {
+        $("field").value = q.field;
+      }
       $("pillConn").textContent = "online";
       $("pillConn").className = "pill ok";
       if (!data.runs?.length) {
@@ -315,7 +354,12 @@
       const data = await apiJSON(`/runs/${encodeURIComponent(runId)}/snapshots`);
       state.frames = data.frames || [];
       $("frame").max = Math.max(0, state.frames.length - 1);
-      $("frame").value = 0;
+      const q = readQuery();
+      let start = 0;
+      if (q.frame != null && Number.isFinite(q.frame)) {
+        start = Math.max(0, Math.min(state.frames.length - 1, Math.floor(q.frame)));
+      }
+      $("frame").value = start;
       $("frameMax").textContent = `/ ${Math.max(0, state.frames.length - 1)}`;
       $("pillFrames").textContent = `${state.frames.length} frames`;
       $("pillFrames").className = state.frames.length ? "pill ok" : "pill warn";
@@ -327,12 +371,26 @@
           : meta.detail_level != null
             ? `detail L${meta.detail_level}`
             : "mesh —";
+      if (meta.energy_trusted === true) {
+        $("pillTrust").textContent = "energy trusted";
+        $("pillTrust").className = "pill ok";
+      } else if (meta.energy_trusted === false) {
+        $("pillTrust").textContent = "energy untrusted";
+        $("pillTrust").className = "pill warn";
+      } else {
+        $("pillTrust").textContent = "energy —";
+        $("pillTrust").className = "pill";
+      }
+      const resid = meta.relative_residual;
+      $("eResid").textContent =
+        typeof resid === "number" && Number.isFinite(resid) ? resid.toExponential(2) : "—";
       $("stageBadge").textContent =
         meta.detail_level != null
           ? `detail level ${meta.detail_level} · ${nCells ?? "?"} cells`
           : "plasma loop · arrows = flow";
       setEmpty(!state.frames.length);
-      draw(0);
+      draw(start);
+      writeQuery();
     }
 
     function segmentMap(frame) {
@@ -444,23 +502,27 @@
         const baseW = isChamber ? 26 : isThrottle ? 16 : 14;
 
         if (cells && cells.length) {
+          // Under-tube for continuity, then discrete beads for each mesh cell.
+          let segCol = "rgba(138,154,166,0.35)";
+          if (s && Number.isFinite(Number(s[field]))) {
+            segCol = colorMap((Number(s[field]) - lo) / (hi - lo));
+          }
+          drawRoundedTube(ctx, a, b, Math.max(6, baseW * 0.45), segCol);
           const n = cells.length;
+          const beadR = Math.max(3.5, Math.min(8, baseW * 0.42));
           for (let i = 0; i < n; i++) {
-            const t0 = i / n;
-            const t1 = (i + 1) / n;
-            const p0 = pointOnSeg(a, b, t0);
-            const p1 = pointOnSeg(a, b, t1);
+            const t = (i + 0.5) / n;
+            const p = pointOnSeg(a, b, t);
             const v = Number(cells[i][field]);
             const col = Number.isFinite(v)
               ? colorMap((v - lo) / (hi - lo))
               : "rgba(138,154,166,0.4)";
-            drawRoundedTube(ctx, p0, p1, baseW, col);
-            // cell separators
-            ctx.strokeStyle = "rgba(7,11,14,0.35)";
-            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(p0.x, p0.y);
-            ctx.lineTo(p1.x, p1.y);
+            ctx.fillStyle = col;
+            ctx.strokeStyle = "rgba(7,11,14,0.55)";
+            ctx.lineWidth = 1.25;
+            ctx.arc(p.x, p.y, beadR, 0, Math.PI * 2);
+            ctx.fill();
             ctx.stroke();
           }
         } else {
@@ -577,11 +639,15 @@
       $("fUnit").textContent = meta.unit;
       $("fRange").textContent = `${meta.fmt(lo)} → ${meta.fmt(hi)}`;
       $("nCells").textContent = String((frame.cells || []).length || "—");
-      $("ia").textContent = comps.throttle_a ? Number(comps.throttle_a.current).toFixed(3) : "—";
-      $("ib").textContent = comps.throttle_b ? Number(comps.throttle_b.current).toFixed(3) : "—";
+      $("ia").textContent = comps.throttle_a ? Number(comps.throttle_a.current).toFixed(2) : "—";
+      $("ib").textContent = comps.throttle_b ? Number(comps.throttle_b.current).toFixed(2) : "—";
       $("legendLo").textContent = meta.fmt(lo);
       $("legendHi").textContent = meta.fmt(hi);
       $("legendField").textContent = `${meta.short} (${meta.unit})`;
+      const runMeta = state.runMeta[$("run").value] || {};
+      if (typeof runMeta.relative_residual === "number") {
+        $("eResid").textContent = runMeta.relative_residual.toExponential(2);
+      }
     }
 
     function setPlaying(on) {
@@ -594,12 +660,13 @@
     function tick(ts) {
       if (!state.playing) return;
       state.animPhase = (state.animPhase + 0.04) % 1;
-      if (ts - state.lastTs > 90) {
+      if (ts - state.lastTs > playIntervalMs()) {
         state.lastTs = ts;
         let i = Number($("frame").value) + 1;
         if (i >= state.frames.length) i = 0;
         $("frame").value = i;
         draw(i);
+        writeQuery();
       } else {
         draw(Number($("frame").value));
       }
@@ -623,9 +690,16 @@
     }
 
     $("play").onclick = () => setPlaying(!state.playing);
-    $("frame").oninput = () => draw(Number($("frame").value));
-    $("field").onchange = () => draw(Number($("frame").value));
+    $("frame").oninput = () => {
+      draw(Number($("frame").value));
+      writeQuery();
+    };
+    $("field").onchange = () => {
+      draw(Number($("frame").value));
+      writeQuery();
+    };
     $("run").onchange = () => loadRun($("run").value);
+    $("speed").onchange = () => {};
     $("reload").onclick = async () => {
       await loadRuns();
       if ($("run").value) await loadRun($("run").value);
@@ -640,19 +714,23 @@
       if (e.code === "ArrowRight") {
         e.preventDefault();
         step(1);
+        writeQuery();
       }
       if (e.code === "ArrowLeft") {
         e.preventDefault();
         step(-1);
+        writeQuery();
       }
       if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         cycleField();
+        writeQuery();
       }
     });
 
     (async () => {
       try {
+        if (window.OuroborosAPI?.bindStaticLinks) OuroborosAPI.bindStaticLinks();
         await loadGeometry();
         await loadRuns();
         if ($("run").value) await loadRun($("run").value);

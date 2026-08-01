@@ -23,12 +23,27 @@
     return path;
   }
 
+  /** Resolve a logical API path for fetch() or <a href>. */
+  function hrefFor(path) {
+    return cfg.mode === "static" ? staticUrl(path) : path;
+  }
+
   async function apiJSON(path) {
-    const url = cfg.mode === "static" ? staticUrl(path) : path;
+    const url = hrefFor(path);
     const r = await fetch(url);
     if (!r.ok) throw new Error(`${url} → ${r.status}`);
     return r.json();
   }
 
-  global.OuroborosAPI = { apiJSON, staticUrl, cfg };
+  /** Wire footer / protocol links so static Pages does not 404 on /health etc. */
+  function bindStaticLinks(root) {
+    const scope = root || document;
+    scope.querySelectorAll("[data-api-href]").forEach((el) => {
+      const path = el.getAttribute("data-api-href");
+      if (!path) return;
+      el.setAttribute("href", hrefFor(path));
+    });
+  }
+
+  global.OuroborosAPI = { apiJSON, staticUrl, hrefFor, bindStaticLinks, cfg };
 })(window);

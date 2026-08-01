@@ -140,9 +140,9 @@ def run_simulation(
         for k, v in sample.items():
             series.setdefault(k, []).append(float(v))
         if hasattr(system, "zone_snapshot_segments"):
-            zone_snapshots.append(system.zone_snapshot_segments(y))  # type: ignore[attr-defined]
+            zone_snapshots.append(system.zone_snapshot_segments(y))
         if hasattr(system, "cell_snapshot") and config.oned.export_cells_in_snapshot:
-            cell_snapshots.append(system.cell_snapshot(y))  # type: ignore[attr-defined]
+            cell_snapshots.append(system.cell_snapshot(y))
         if not ledger.trusted:
             energy_trusted = False
 
