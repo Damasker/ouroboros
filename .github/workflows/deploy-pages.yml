@@ -2,7 +2,7 @@ name: deploy-pages
 
 on:
   push:
-    branches: [main, master, "cursor/**"]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,19 @@ jobs:
           python-version: "3.12"
       - name: Install
         run: make setup
+      - name: Cache public demo runs
+        id: demo-cache
+        uses: actions/cache@v4
+        with:
+          path: results/_public_demo
+          key: public-demo-${{ hashFiles('configs/**/*.yaml', 'scripts/export_public_site.py', 'src/ouroboros/**/*.py', 'geometry/loop_geometry.json') }}
       - name: Export public site
-        run: python scripts/export_public_site.py --root . --out site --domain ouroboros.beart.cc
+        run: |
+          if [ "${{ steps.demo-cache.outputs.cache-hit }}" = "true" ]; then
+            python scripts/export_public_site.py --root . --out site --domain ouroboros.beart.cc --skip-run
+          else
+            python scripts/export_public_site.py --root . --out site --domain ouroboros.beart.cc
+          fi
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

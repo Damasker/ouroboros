@@ -16,9 +16,21 @@ jobs:
         run: make setup
       - name: Lint
         run: make lint
+      - name: Typecheck
+        run: make typecheck
       - name: Test
         run: make test
       - name: Passive demo
         run: |
           make run-scenario SCENARIO=passive
           make visualize RUN=passive
+      - name: 1D HLLD energy trust
+        run: |
+          make run-scenario SCENARIO=oned-hlld
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          er = json.loads(Path("results/oned-hlld/energy_report.json").read_text(encoding="utf-8"))
+          assert er.get("energy_trusted") is True, er
+          print("energy_trusted OK", er.get("ledger", {}).get("relative_residual"))
+          PY
